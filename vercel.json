@@ -20,9 +20,6 @@
       "dest": "/public/$1"
     }
   ],
-  "env": {
-    "GNEWS_API_KEY": "@gnews_api_key"
-  },
   "headers": [
     {
       "source": "/api/(.*)",
