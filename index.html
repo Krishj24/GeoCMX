@@ -1,0 +1,1844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GeoIntel Terminal</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#ffffff;--bg2:#f7f6f2;--bg3:#f0efe9;
+    --text:#1a1a18;--text2:#5f5e5a;--text3:#9c9a92;
+    --border:rgba(0,0,0,0.11);--border2:rgba(0,0,0,0.20);
+    --radius:8px;--radius-lg:12px;
+    --coral:#D85A30;--coral-bg:#FAECE7;--coral-text:#712B13;
+    --blue:#185FA5;--blue-bg:#E6F1FB;--blue-text:#0C447C;
+    --amber:#BA7517;--amber-bg:#FAEEDA;--amber-text:#633806;
+    --green:#3B6D11;--green-bg:#EAF3DE;--green-text:#27500A;
+    --red:#A32D2D;--red-bg:#FCEBEB;--red-text:#501313;
+    --purple-bg:#EEEDFE;--purple-text:#3C3489;
+    --teal:#0F6E56;--teal-bg:#E1F5EE;--teal-text:#085041;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{
+      --bg:#1c1c1a;--bg2:#242422;--bg3:#2c2c2a;
+      --text:#e8e6de;--text2:#a8a69e;--text3:#6e6c66;
+      --border:rgba(255,255,255,0.09);--border2:rgba(255,255,255,0.18);
+      --coral-bg:#3a1a0e;--coral-text:#F0997B;
+      --blue-bg:#0a1e35;--blue-text:#85B7EB;
+      --amber-bg:#2a1a05;--amber-text:#EF9F27;
+      --green-bg:#0f2005;--green-text:#97C459;
+      --red-bg:#2a0a0a;--red-text:#F09595;
+      --purple-bg:#1a1830;--purple-text:#AFA9EC;
+      --teal-bg:#04342C;--teal-text:#9FE1CB;
+    }
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;padding:14px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;max-width:1200px;margin-left:auto;margin-right:auto}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-mark{width:32px;height:32px;background:var(--coral);border-radius:8px;display:flex;align-items:center;justify-content:center}
+  .logo-mark svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round}
+  .logo-name{font-size:17px;font-weight:600;letter-spacing:-0.02em}
+  .logo-sub{font-size:11px;color:var(--text3);margin-top:1px}
+  .live-pill{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--green);background:var(--green-bg);padding:4px 10px;border-radius:20px}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+  .terminal{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;max-width:1200px;margin:0 auto}
+  .topbar{display:flex;border-bottom:0.5px solid var(--border)}
+  .tab-btn{flex:1;padding:12px 0;font-size:13px;font-weight:500;background:none;border:none;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+  .tab-btn.active{color:var(--text);border-bottom:2px solid var(--coral);background:var(--bg2)}
+  .tab-btn:hover:not(.active){background:var(--bg2);color:var(--text)}
+  .panel{display:none;padding:14px}
+  .panel.active{display:block}
+
+  .status-bar{display:flex;align-items:center;gap:8px;padding:6px 11px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);margin-bottom:11px;font-size:11px;color:var(--text3)}
+  .s-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .s-green{background:#639922;animation:pulse 1.5s infinite}
+  .s-amber{background:var(--amber)}
+  .src-badge{font-size:10px;padding:2px 7px;border-radius:3px;background:var(--bg);border:0.5px solid var(--border);color:var(--text3);margin-left:auto;white-space:nowrap}
+  .section-label{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px}
+  .spinner{display:inline-block;width:13px;height:13px;border:1.5px solid var(--border2);border-top-color:var(--coral);border-radius:50%;animation:spin .7s linear infinite}
+
+  /* ── GEO PANEL ── */
+  .legend-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;font-size:10px;color:var(--text3)}
+  .l-item{display:flex;align-items:center;gap:4px}
+  .l-dot{width:7px;height:7px;border-radius:50%}
+  .custom-row{display:flex;gap:8px;margin-bottom:12px}
+  .custom-input{flex:1;padding:8px 12px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;transition:border-color .15s}
+  .custom-input:focus{border-color:var(--coral)}
+  .go-btn{padding:8px 16px;font-size:13px;font-weight:500;background:var(--coral);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;white-space:nowrap;transition:opacity .15s}
+  .go-btn:hover{opacity:.88}
+  .geo-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:700px){.geo-grid{grid-template-columns:1fr}}
+  .news-scroll{max-height:460px;overflow-y:auto;display:flex;flex-direction:column;gap:5px}
+  .news-scroll::-webkit-scrollbar{width:3px}
+  .news-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+  .news-item{padding:9px 11px;border:0.5px solid var(--border);border-left:3px solid transparent;border-radius:var(--radius);cursor:pointer;transition:all .15s}
+  .news-item:hover{background:var(--bg2);transform:translateX(2px)}
+  .news-item.sev-critical{border-left-color:var(--red)}
+  .news-item.sev-high{border-left-color:var(--coral)}
+  .news-item.sev-moderate{border-left-color:var(--amber)}
+  .news-item.sev-low{border-left-color:var(--green)}
+  .news-top{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+  .news-tag{font-size:10px;font-weight:500;padding:2px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0}
+  .tag-war{background:var(--coral-bg);color:var(--coral-text)}
+  .tag-sanction{background:var(--blue-bg);color:var(--blue-text)}
+  .tag-supply{background:var(--amber-bg);color:var(--amber-text)}
+  .tag-trade{background:var(--green-bg);color:var(--green-text)}
+  .tag-geo{background:var(--purple-bg);color:var(--purple-text)}
+  .sev-badge{font-size:10px;font-weight:500;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0;margin-left:auto;display:flex;align-items:center;gap:4px}
+  .sev-badge.critical{background:var(--red-bg);color:var(--red-text)}
+  .sev-badge.high{background:var(--coral-bg);color:var(--coral-text)}
+  .sev-badge.moderate{background:var(--amber-bg);color:var(--amber-text)}
+  .sev-badge.low{background:var(--green-bg);color:var(--green-text)}
+  .sev-dot-sm{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+  .sev-dot-sm.critical{background:var(--red);animation:pulse 1s infinite}
+  .sev-dot-sm.high{background:var(--coral)}
+  .sev-dot-sm.moderate{background:var(--amber)}
+  .sev-dot-sm.low{background:var(--green)}
+  .news-title{font-size:12px;color:var(--text);line-height:1.5}
+  .news-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+  .news-meta{font-size:10px;color:var(--text3)}
+  .impact-pills{display:flex;gap:3px;flex-wrap:wrap}
+  .impact-pill{font-size:10px;padding:1px 5px;border-radius:3px;font-weight:500}
+  .pill-up{background:var(--green-bg);color:var(--green-text)}
+  .pill-down{background:var(--red-bg);color:var(--red-text)}
+  .news-actions{display:flex;gap:6px;margin-top:7px}
+  .btn-analyze{flex:1;padding:5px 0;font-size:11px;font-weight:500;background:var(--coral);color:#fff;border:none;border-radius:5px;cursor:pointer;transition:opacity .15s;text-align:center}
+  .btn-analyze:hover{opacity:.85}
+  .btn-source{flex:1;padding:5px 0;font-size:11px;font-weight:500;background:none;color:var(--text2);border:0.5px solid var(--border2);border-radius:5px;cursor:pointer;transition:all .15s;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:4px}
+  .btn-source:hover{background:var(--bg2);color:var(--text)}
+  .summary-panel{display:flex;flex-direction:column;gap:10px}
+  .dash-card{border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .dash-card-head{padding:9px 13px;background:var(--bg2);border-bottom:0.5px solid var(--border);font-size:11px;font-weight:500;color:var(--text2)}
+  .dash-card-body{padding:12px}
+  .risk-score-row{display:flex;align-items:center;gap:12px}
+  .risk-num{font-size:38px;font-weight:600;line-height:1}
+  .risk-scale{flex:1}
+  .risk-bar-bg{background:var(--bg2);border-radius:4px;height:8px;overflow:hidden;margin-bottom:5px}
+  .risk-bar-fill{height:100%;border-radius:4px;transition:width .8s ease}
+  .risk-lbl{font-size:13px;font-weight:500}
+  .risk-sub{font-size:10px;color:var(--text3);margin-top:2px}
+  .sev-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:11px}
+  .sev-row:last-child{margin-bottom:0}
+  .sev-lbl{width:62px;flex-shrink:0;font-weight:500}
+  .sev-track{flex:1;background:var(--bg2);border-radius:3px;height:10px;overflow:hidden}
+  .sev-fill{height:100%;border-radius:3px}
+  .sev-cnt{width:18px;text-align:right;color:var(--text3);font-weight:500}
+  .analysis-box{border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-top:12px;animation:fadeIn .3s ease}
+  .analysis-head{padding:9px 13px;background:var(--bg2);border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:500;color:var(--text2)}
+  .analysis-body{padding:13px;font-size:13px;line-height:1.75;color:var(--text2);min-height:100px}
+
+  /* ── COMMODITY PANEL ── */
+  .com-cat-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+  .cat-tab{padding:5px 12px;font-size:11px;font-weight:500;background:var(--bg2);border:0.5px solid var(--border);border-radius:20px;cursor:pointer;color:var(--text2);transition:all .15s}
+  .cat-tab.active{background:var(--coral);color:#fff;border-color:var(--coral)}
+  .cat-tab:hover:not(.active){background:var(--bg3)}
+  .com-grid-full{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:14px}
+  @media(max-width:800px){.com-grid-full{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:500px){.com-grid-full{grid-template-columns:repeat(2,1fr)}}
+  .com-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:9px 11px;cursor:pointer;transition:all .15s;position:relative}
+  .com-card.selected{border-color:var(--coral)}
+  .com-card:hover:not(.selected){background:var(--bg3)}
+  .com-name{font-size:10px;color:var(--text3);font-weight:500;margin-bottom:2px}
+  .com-price{font-size:16px;font-weight:600;color:var(--text)}
+  .com-unit{font-size:9px;color:var(--text3)}
+  .com-chg{font-size:11px;margin-top:2px}
+  .up{color:var(--green)} .dn{color:var(--red)}
+  .com-pressure-bar{height:3px;border-radius:2px;margin-top:5px;background:var(--bg3);overflow:hidden}
+  .com-pressure-fill{height:100%;border-radius:2px;transition:width .5s}
+
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:2px}
+  @media(max-width:700px){.two-col{grid-template-columns:1fr}}
+  .chart-wrap{border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .chart-head{padding:9px 13px;background:var(--bg2);border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .chart-title{font-size:12px;font-weight:500;color:var(--text)}
+  .chart-sub{font-size:10px;color:var(--text3)}
+  .chart-body{padding:10px;position:relative;height:190px}
+  .prod-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:11px}
+  .prod-lbl{width:90px;text-align:right;flex-shrink:0;color:var(--text2)}
+  .prod-bg{flex:1;background:var(--bg2);border-radius:3px;height:12px;overflow:hidden}
+  .prod-fill{height:100%;border-radius:3px;transition:width .6s}
+  .prod-val{width:58px;color:var(--text);font-weight:500}
+  .alert-strip{background:var(--coral-bg);border:0.5px solid #F5C4B3;border-radius:var(--radius);padding:7px 11px;font-size:11px;color:var(--coral-text);display:flex;gap:7px;margin-top:8px;line-height:1.5}
+
+  /* ── LEADERBOARD ── */
+  .leaderboard{border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-top:14px}
+  .lb-head{padding:10px 14px;background:var(--bg2);border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .lb-title{font-size:12px;font-weight:500;color:var(--text)}
+  .lb-sub{font-size:10px;color:var(--text3)}
+  .lb-item{padding:9px 14px;border-bottom:0.5px solid var(--border);cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:10px}
+  .lb-item:last-child{border-bottom:none}
+  .lb-item:hover{background:var(--bg2)}
+  .lb-item.expanded{background:var(--bg2)}
+  .lb-rank{width:20px;font-size:12px;font-weight:600;color:var(--text3);flex-shrink:0;text-align:center}
+  .lb-rank.r1{color:var(--red)}
+  .lb-rank.r2{color:var(--coral)}
+  .lb-rank.r3{color:var(--amber)}
+  .lb-name{font-size:12px;font-weight:500;color:var(--text);width:110px;flex-shrink:0}
+  .lb-cat{font-size:10px;color:var(--text3);width:52px;flex-shrink:0}
+  .lb-bar-wrap{flex:1}
+  .lb-bar-bg{background:var(--bg3);border-radius:3px;height:8px;overflow:hidden}
+  .lb-bar-fill{height:100%;border-radius:3px;transition:width .6s}
+  .lb-score{font-size:12px;font-weight:600;width:32px;text-align:right;flex-shrink:0}
+  .lb-arrow{font-size:11px;color:var(--text3);flex-shrink:0;transition:transform .2s}
+  .lb-arrow.open{transform:rotate(90deg)}
+  .lb-detail{display:none;padding:10px 14px 12px 44px;background:var(--bg2);border-bottom:0.5px solid var(--border);animation:fadeIn .2s ease}
+  .lb-detail.open{display:block}
+  .lb-detail-title{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:7px}
+  .lb-event-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;font-size:11px;line-height:1.5}
+  .lb-event-sev{font-size:10px;font-weight:500;padding:1px 6px;border-radius:3px;flex-shrink:0;margin-top:1px}
+  .lb-event-impact{font-size:11px;font-weight:600;width:28px;flex-shrink:0;text-align:right}
+  .lb-event-text{color:var(--text2);flex:1}
+
+  /* ── WATCHLIST ── */
+  .wl-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+  .wl-table th{padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;border-bottom:0.5px solid var(--border);white-space:nowrap}
+  .wl-table th.num{text-align:right}
+  .wl-table td{padding:8px 10px;border-bottom:0.5px solid var(--border);vertical-align:middle;white-space:nowrap}
+  .wl-table tr:last-child td{border-bottom:none}
+  .wl-table tr:hover td{background:var(--bg2)}
+  .wl-sym{font-weight:600;color:var(--text);font-size:12px}
+  .wl-name{font-size:10px;color:var(--text3);margin-top:1px}
+  .wl-sector{font-size:10px;padding:1px 6px;border-radius:3px;background:var(--bg3);color:var(--text3);display:inline-block}
+  .wl-price{font-weight:600;color:var(--text);text-align:right}
+  .wl-chg{font-weight:500;text-align:right;font-size:11px}
+  .wl-num{text-align:right;color:var(--text3);font-size:11px}
+  .wl-up{color:var(--green)} .wl-dn{color:var(--red)}
+  .wl-wrap{border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .wl-head{padding:9px 13px;background:var(--bg2);border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .wl-title{font-size:12px;font-weight:500;color:var(--text)}
+  .wl-sub{font-size:10px;color:var(--text3)}
+  .wl-scroll{overflow-x:auto}
+
+  footer{text-align:center;font-size:10px;color:var(--text3);margin-top:12px;max-width:1200px;margin-left:auto;margin-right:auto;padding-bottom:6px}
+
+  .tv-section{margin-top:14px}
+  .tv-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+  .tv-title{font-size:13px;font-weight:500;color:var(--text)}
+  .tv-open-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;font-size:12px;font-weight:500;background:var(--blue-bg);color:var(--blue-text);border:0.5px solid var(--blue-text);border-radius:var(--radius);text-decoration:none;transition:all .15s}
+  .tv-open-btn:hover{background:var(--blue);color:#fff}
+  .tv-charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:700px){.tv-charts-grid{grid-template-columns:1fr}}
+  .tv-chart-card{border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+  .tv-chart-head{padding:8px 12px;background:var(--bg2);border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .tv-chart-label{font-size:11px;font-weight:500;color:var(--text2)}
+  .tv-chart-type{font-size:10px;color:var(--text3)}
+  .tv-chart-body{position:relative;height:320px;background:var(--bg)}
+  .tv-placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text3);font-size:12px;flex-direction:column;gap:8px}
+
+  .brief-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:680px){.brief-grid{grid-template-columns:1fr}}
+  .brief-card{border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--bg)}
+  .brief-card-head{padding:9px 13px;border-bottom:0.5px solid var(--border);display:flex;align-items:flex-start;gap:7px}
+  .bcat{font-size:10px;font-weight:600;padding:2px 7px;border-radius:3px;text-transform:uppercase;flex-shrink:0;margin-top:1px}
+  .bcat-war{background:var(--red-bg);color:var(--red-text)}
+  .bcat-market{background:var(--blue-bg);color:var(--blue-text)}
+  .bcat-india{background:var(--green-bg);color:var(--green-text)}
+  .bcat-tech{background:var(--purple-bg);color:var(--purple-text)}
+  .bcat-energy{background:var(--amber-bg);color:var(--amber-text)}
+  .bcat-portfolio{background:var(--teal-bg);color:var(--teal-text)}
+  .bcat-geo{background:var(--purple-bg);color:var(--purple-text)}
+  .bcat-sanction{background:var(--blue-bg);color:var(--blue-text)}
+  .bcat-supply{background:var(--amber-bg);color:var(--amber-text)}
+  .bcat-trade{background:var(--green-bg);color:var(--green-text)}
+  .brief-hl{font-size:12px;font-weight:500;color:var(--text);line-height:1.4;flex:1}
+  .brief-body{padding:10px 13px;font-size:11.5px;color:var(--text2);line-height:1.72}
+  .brief-footer{padding:7px 13px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .brief-src{font-size:10px;color:var(--text3)}
+  .brief-btn{font-size:11px;padding:4px 10px;background:var(--coral);color:#fff;border:none;border-radius:4px;cursor:pointer;text-decoration:none;display:inline-block;white-space:nowrap}
+  .brief-btn:hover{opacity:.88}
+  .tick-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:12px}
+  @media(max-width:560px){.tick-strip{grid-template-columns:repeat(2,1fr)}}
+  .tick-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:9px 11px;text-align:center}
+  .tick-name{font-size:10px;color:var(--text3);font-weight:500;margin-bottom:2px}
+  .tick-val{font-size:16px;font-weight:600;color:var(--text)}
+  .tick-chg{font-size:11px;margin-top:2px}
+  .macro-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  @media(max-width:560px){.macro-grid{grid-template-columns:repeat(2,1fr)}}
+  .macro-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 11px}
+  .macro-lbl{font-size:10px;color:var(--text3);font-weight:500;margin-bottom:3px}
+  .macro-val{font-size:20px;font-weight:600;color:var(--text);line-height:1}
+  .macro-sub{font-size:10px;color:var(--text3);margin-top:2px}
+  .mup{color:var(--green)} .mdn{color:var(--red)} .mwarn{color:var(--amber)}
+  .macro-sh{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin:12px 0 7px;padding-bottom:5px;border-bottom:0.5px solid var(--border)}
+  .port-row{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:0.5px solid var(--border)}
+  .port-row:last-child{border-bottom:none}
+  .port-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:3px;flex-shrink:0;margin-top:1px;white-space:nowrap}
+  .pbuy{background:var(--green-bg);color:var(--green-text)}
+  .pavoid{background:var(--red-bg);color:var(--red-text)}
+  .phold{background:var(--amber-bg);color:var(--amber-text)}
+  .pwatch{background:var(--blue-bg);color:var(--blue-text)}
+  .pspec{background:var(--purple-bg);color:var(--purple-text)}
+  .port-txt{font-size:12px;color:var(--text2);line-height:1.6;flex:1}
+  .port-name{font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px}
+  .cal-day-h{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;padding:9px 0 5px;margin-top:8px;border-bottom:0.5px solid var(--border)}
+  .cal-day-h:first-child{margin-top:0}
+  .cal-row{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:12px}
+  .cal-row:last-child{border-bottom:none}
+  .cal-time{width:54px;flex-shrink:0;color:var(--text3);font-size:11px;font-weight:500}
+  .cal-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .chi{background:var(--red)} .cme{background:var(--amber)} .clo{background:var(--green)}
+  .cal-ctry{width:28px;font-size:10px;font-weight:600;color:var(--text3);flex-shrink:0}
+  .cal-ev{flex:1;color:var(--text);font-weight:500}
+  .cal-num{width:62px;text-align:right;font-size:11px}
+  .cbeat{color:var(--green);font-weight:600} .cmiss{color:var(--red);font-weight:600} .cpend{color:var(--text3)}
+  .cal-col-h{display:flex;align-items:center;gap:9px;padding:0 0 5px;font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;border-bottom:0.5px solid var(--border);margin-bottom:3px}
+  .cfbtn{padding:4px 11px;font-size:11px;font-weight:500;background:var(--bg2);color:var(--text2);border:0.5px solid var(--border);border-radius:4px;cursor:pointer;transition:all .15s}
+  .cfbtn.active{background:var(--coral);color:#fff;border-color:var(--coral)}
+  .analysis-loading{display:flex;align-items:center;gap:8px;color:var(--text3);font-size:12px;padding:8px 0}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M6 6 Q12 10 18 6"/><path d="M6 18 Q12 14 18 18"/></svg>
+    </div>
+    <div>
+      <div class="logo-name">GeoIntel Terminal</div>
+      <div class="logo-sub">Geopolitical risk · commodity markets</div>
+    </div>
+  </div>
+  <div class="live-pill"><div class="live-dot"></div><span id="live-label">Connecting…</span></div>
+</header>
+
+<div class="terminal">
+  <div class="topbar">
+    <button class="tab-btn active" onclick="switchTab('geo')">GeoIntel Feed</button>
+    <button class="tab-btn" onclick="switchTab('data')">Commodity Data</button>
+    <button class="tab-btn" onclick="switchTab('war')">&#9888; War Intel</button>
+    <button class="tab-btn" onclick="switchTab('india')">India + Tech</button>
+    <button class="tab-btn" onclick="switchTab('macro')">India Macro</button>
+    <button class="tab-btn" onclick="switchTab('calendar')">Econ Calendar</button>
+  </div>
+
+  <!-- ══ GEO PANEL ══ -->
+  <div id="geo-panel" class="panel active">
+    <div class="status-bar">
+      <div class="s-dot s-amber" id="news-dot"></div>
+      <span id="news-status">Connecting to live news…</span>
+      <span class="src-badge">GNews · Claude AI</span>
+    </div>
+    <div class="legend-bar">
+      <span>Severity:</span>
+      <div class="l-item"><div class="l-dot" style="background:var(--red)"></div>Critical</div>
+      <div class="l-item"><div class="l-dot" style="background:var(--coral)"></div>High</div>
+      <div class="l-item"><div class="l-dot" style="background:var(--amber)"></div>Moderate</div>
+      <div class="l-item"><div class="l-dot" style="background:var(--green)"></div>Low</div>
+      <span style="margin-left:4px">· Pills = commodity impact</span>
+    </div>
+    <div class="custom-row">
+      <input class="custom-input" id="custom-input" placeholder="Type any geopolitical event to analyze…"/>
+      <button class="go-btn" id="go-btn" onclick="analyzeCustom()">Analyze ↗</button>
+    </div>
+    <div class="geo-grid">
+      <div>
+        <div class="section-label">Live events</div>
+        <div class="news-scroll" id="news-list">
+          <div style="display:flex;align-items:center;gap:8px;padding:14px;color:var(--text3);font-size:12px">
+            <div class="spinner"></div>Loading live events…
+          </div>
+        </div>
+      </div>
+      <div class="summary-panel">
+        <div class="section-label">Global risk dashboard</div>
+        <div class="dash-card">
+          <div class="dash-card-head">Composite geopolitical risk score</div>
+          <div class="dash-card-body">
+            <div class="risk-score-row">
+              <div class="risk-num" id="risk-num" style="color:var(--coral)">—</div>
+              <div class="risk-scale">
+                <div class="risk-bar-bg"><div class="risk-bar-fill" id="risk-bar" style="width:0%;background:var(--coral)"></div></div>
+                <div class="risk-lbl" id="risk-lbl" style="color:var(--coral)">Loading…</div>
+                <div class="risk-sub">out of 10 · weighted across active events</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-head">Breakdown by severity</div>
+          <div class="dash-card-body" id="sev-breakdown"><div style="color:var(--text3);font-size:12px">Loading…</div></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-head">Most exposed commodities</div>
+          <div class="dash-card-body" id="exposure-list"><div style="color:var(--text3);font-size:12px">Loading…</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="analysis-box" id="analysis-box" style="display:none">
+      <div class="analysis-head">
+        <span id="analysis-title">Analysis</span>
+        <span class="src-badge">Claude AI</span>
+      </div>
+      <div class="analysis-body" id="analysis-body"></div>
+    </div>
+  </div>
+
+  <!-- ══ COMMODITY PANEL ══ -->
+  <div id="data-panel" class="panel">
+    <div class="status-bar">
+      <div class="s-dot s-amber" id="price-dot"></div>
+      <span id="price-status">Loading commodity prices…</span>
+      <span class="src-badge">TradingView · EIA</span>
+    </div>
+
+    <div class="com-cat-tabs" id="cat-tabs"></div>
+    <div class="com-grid-full" id="com-grid"></div>
+
+    <div class="alert-strip" id="geo-alert" style="display:none;margin-bottom:10px">
+      <span style="flex-shrink:0">⚠</span><span id="geo-alert-text"></span>
+    </div>
+
+    <!-- TRADINGVIEW CHARTS -->
+    <div class="tv-section" id="tv-section" style="display:none">
+      <div class="tv-header">
+        <div class="tv-title" id="tv-title">Select a commodity to view live charts</div>
+        <a class="tv-open-btn" id="tv-open-link" href="https://www.tradingview.com" target="_blank" rel="noopener">
+          Open full chart in TradingView ↗
+        </a>
+      </div>
+      <div class="tv-chart-card">
+          <div class="tv-chart-head">
+            <span class="tv-chart-label" id="tv-spot-label">Spot Price</span>
+            <span class="tv-chart-type">Live · TradingView</span>
+          </div>
+          <div class="tv-chart-body" id="tv-spot-container">
+            <div class="tv-placeholder"><div class="spinner"></div>Loading chart…</div>
+          </div>
+        </div>
+    </div>
+
+    <!-- PRODUCERS -->
+    <div class="two-col" style="margin-top:14px">
+      <div>
+        <div class="section-label" style="margin-bottom:6px">Top producers</div>
+        <div id="prod-bars"></div>
+      </div>
+      <div id="chart-placeholder" style="display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:12px">
+        Click a commodity above to view live TradingView charts
+      </div>
+    </div>
+
+    <!-- LEADERBOARD -->
+    <div class="leaderboard">
+      <div class="lb-head">
+        <span class="lb-title">Top 10 Most Pressured Commodities</span>
+        <span class="lb-sub">Ranked by geopolitical pressure score · click to see driving events</span>
+      </div>
+      <div id="leaderboard-body">
+        <div style="padding:16px;color:var(--text3);font-size:12px;display:flex;align-items:center;gap:8px">
+          <div class="spinner"></div>Calculating pressure scores…
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end data-panel -->
+
+  <!-- WAR INTEL -->
+  <div id="war-panel" class="panel">
+    <div class="status-bar">
+      <div class="s-dot" style="background:var(--red);animation:pulse 1s infinite"></div>
+      <span id="war-status">Loading war intelligence feed...</span>
+      <span class="src-badge">GNews · Reuters · Al Jazeera</span>
+    </div>
+    <div class="tick-strip">
+      <div class="tick-card"><div class="tick-name">Brent Crude</div><div class="tick-val">$89</div><div class="tick-chg up">Post-ceasefire</div></div>
+      <div class="tick-card"><div class="tick-name">Gold</div><div class="tick-val">$3,280</div><div class="tick-chg up">Safe haven ATH</div></div>
+      <div class="tick-card"><div class="tick-name">USD/INR</div><div class="tick-val">87.82</div><div class="tick-chg up">Rupee recovery</div></div>
+      <div class="tick-card"><div class="tick-name">Sensex</div><div class="tick-val">80,110</div><div class="tick-chg up">+8,146 from lows</div></div>
+    </div>
+    <div class="brief-grid" id="war-cards">
+      <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;color:var(--text3);font-size:12px;padding:16px 0">
+        <div class="spinner"></div>Loading live war coverage...
+      </div>
+    </div>
+    <div style="margin-top:11px;padding:10px 13px;background:var(--blue-bg);border:0.5px solid var(--blue-text);border-radius:var(--radius-lg);font-size:12px;color:var(--blue-text);line-height:1.7">
+      <strong>India angle — Apr 2026:</strong> Ceasefire holds. Hormuz fully open since Apr 3. Brent at $89 saves India ~Rs 1.1 lakh crore annually vs $103 peak. RBI cut 25bp to 6.0% on Apr 9. Rupee recovered to 87.82 from 94.2 peak. SPR fully stocked at all 3 facilities. Next risk trigger: Houthi resumption or ceasefire breakdown after Oman talks.
+    </div>
+    <div class="analysis-box" id="war-analysis-box" style="display:none">
+      <div class="analysis-head">
+        <span id="war-analysis-title">Analysis</span>
+        <span class="src-badge">Groq LLaMA 3.3</span>
+      </div>
+      <div class="analysis-body" id="war-analysis-body"></div>
+    </div>
+  </div>
+
+  <!-- INDIA + TECH -->
+  <div id="india-panel" class="panel">
+    <div class="status-bar">
+      <div class="s-dot s-green"></div>
+      <span id="india-status">Loading India macro and tech coverage...</span>
+      <span class="src-badge">GNews · TechCrunch · Inc42</span>
+    </div>
+    <div class="tick-strip">
+      <div class="tick-card"><div class="tick-name">Nifty 50</div><div class="tick-val">24,280</div><div class="tick-chg up">+2,316 from lows</div></div>
+      <div class="tick-card"><div class="tick-name">Repo Rate</div><div class="tick-val">6.0%</div><div class="tick-chg up">Cut Apr 9</div></div>
+      <div class="tick-card"><div class="tick-name">India CPI</div><div class="tick-val">3.34%</div><div class="tick-chg up">Mar 2026</div></div>
+      <div class="tick-card"><div class="tick-name">USD/INR</div><div class="tick-val">87.82</div><div class="tick-chg up">Recovery</div></div>
+    </div>
+    <div class="brief-grid" id="india-cards">
+      <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;color:var(--text3);font-size:12px;padding:16px 0">
+        <div class="spinner"></div>Loading India coverage...
+      </div>
+    </div>
+    <div style="margin-top:11px">
+      <div class="macro-sh">Portfolio Signal Board — Week 4 · Mar 27</div>
+      <div id="port-signals"></div>
+    </div>
+    <div class="analysis-box" id="india-analysis-box" style="display:none">
+      <div class="analysis-head">
+        <span id="india-analysis-title">Analysis</span>
+        <span class="src-badge">Groq LLaMA 3.3</span>
+      </div>
+      <div class="analysis-body" id="india-analysis-body"></div>
+    </div>
+  </div>
+
+  <!-- INDIA MACRO -->
+  <div id="macro-panel" class="panel">
+    <div class="status-bar">
+      <div class="s-dot s-amber" id="macro-dot"></div>
+      <span id="macro-status">Loading India macro dashboard…</span>
+      <span class="src-badge">Yahoo Finance · RBI</span>
+    </div>
+    <div class="macro-sh">Markets <span id="macro-last-update" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;color:var(--text3);margin-left:6px"></span></div>
+    <div class="macro-grid" id="macro-markets">
+      <div class="macro-card" style="grid-column:1/-1;display:flex;align-items:center;gap:8px;color:var(--text3);font-size:12px">
+        <div class="spinner"></div>Loading live market data…
+      </div>
+    </div>
+    <div class="macro-sh">Energy and Fuel</div>
+    <div class="macro-grid" id="macro-energy">
+      <div class="macro-card" style="grid-column:1/-1;display:flex;align-items:center;gap:8px;color:var(--text3);font-size:12px">
+        <div class="spinner"></div>Loading…
+      </div>
+    </div>
+    <div class="macro-sh">Inflation and Policy</div>
+    <div class="macro-grid" id="macro-policy">
+      <div class="macro-card" style="grid-column:1/-1;display:flex;align-items:center;gap:8px;color:var(--text3);font-size:12px">
+        <div class="spinner"></div>Loading…
+      </div>
+    </div>
+    <div id="macro-rbi-watch" style="margin-top:10px;display:none;padding:10px 13px;background:var(--blue-bg);border:0.5px solid var(--blue-text);border-radius:var(--radius-lg);font-size:12px;color:var(--blue-text);line-height:1.7"></div>
+
+    <!-- STOCK WATCHLIST -->
+    <div style="margin-top:14px">
+      <div class="macro-sh">NSE Watchlist <span id="wl-last-update" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;color:var(--text3);margin-left:6px"></span></div>
+      <div class="wl-wrap">
+        <div class="wl-head">
+          <span class="wl-title">Top Indian Stocks — Live NSE Prices</span>
+          <span class="wl-sub" id="wl-count">Loading…</span>
+        </div>
+        <div class="wl-scroll">
+          <table class="wl-table">
+            <thead>
+              <tr>
+                <th>Stock</th>
+                <th>Sector</th>
+                <th class="num">Price</th>
+                <th class="num">Chg%</th>
+                <th class="num">Chg (Rs)</th>
+                <th class="num">Volume</th>
+                <th class="num">P/E</th>
+              </tr>
+            </thead>
+            <tbody id="wl-body">
+              <tr><td colspan="7" style="padding:16px;color:var(--text3);font-size:12px;text-align:center">
+                <div style="display:flex;align-items:center;justify-content:center;gap:8px"><div class="spinner"></div>Loading watchlist…</div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECONOMIC CALENDAR -->
+  <div id="calendar-panel" class="panel">
+    <div class="status-bar">
+      <div class="s-dot s-green"></div>
+      <span>Global economic calendar - All times in IST (UTC+5:30)</span>
+      <span class="src-badge">Trading Economics</span>
+    </div>
+    <div style="display:flex;gap:7px;margin-bottom:11px;flex-wrap:wrap">
+      <button class="cfbtn active" onclick="filterCal(this,'all')">All</button>
+      <button class="cfbtn" onclick="filterCal(this,'high')">High Impact</button>
+      <button class="cfbtn" onclick="filterCal(this,'US')">US</button>
+      <button class="cfbtn" onclick="filterCal(this,'IN')">India</button>
+      <button class="cfbtn" onclick="filterCal(this,'EU')">EU</button>
+    </div>
+    <div class="cal-col-h">
+      <span style="width:54px;flex-shrink:0">IST</span>
+      <span style="width:7px;flex-shrink:0"></span>
+      <span style="width:28px;flex-shrink:0">Ctry</span>
+      <span style="flex:1">Event</span>
+      <span class="cal-num">Forecast</span>
+      <span class="cal-num">Previous</span>
+      <span class="cal-num">Actual</span>
+    </div>
+    <div id="calendar-body"></div>
+  </div>
+
+  </div>
+</div>
+
+<footer>GeoIntel Terminal · Powered by Claude AI · Groq LLaMA 3.3 · Data: GNews, TradingView, EIA, World Bank</footer>
+
+<script>
+const BACKEND_URL = ''; // Vercel: API is on same domain — empty string means relative /api/...
+
+const SEV = {
+  critical:{label:'Critical',color:'var(--red)',score:10},
+  high:{label:'High',color:'var(--coral)',score:7},
+  moderate:{label:'Moderate',color:'var(--amber)',score:4},
+  low:{label:'Low',color:'var(--green)',score:1}
+};
+
+// ── COMMODITY DEFINITIONS ──────────────────────────────────────────
+const CATEGORIES = ['All','Metals','Energy','Grains','Softs','Meats'];
+
+const COMMODITIES = [
+  // METALS
+  {id:'gold',name:'Gold',cat:'Metals',unit:'$/oz',ticker:'GC=F',color:'#854F0B',price:'2318',chg:'+0.6%',up:true,
+   alert:'Safe-haven demand elevated. Central bank buying at record pace. Middle East tensions supporting floor.',
+   geo_weight:{war:0.9,sanction:0.8,supply:0.3,trade:0.5,geo:0.8},
+   producers:[{n:'China',v:375,m:400},{n:'Australia',v:310,m:350},{n:'Russia',v:300,m:340},{n:'Canada',v:190,m:230},{n:'USA',v:170,m:210}],
+   base:2280,trend:[2,-1,3,0,1,-2,4,1,0,2,-1,3,0,2,-1,1,3,-1,2,0,1,-1,2,1,0,2,-1,3,1,2]},
+  {id:'silver',name:'Silver',cat:'Metals',unit:'$/oz',ticker:'SI=F',color:'#5F5E5A',price:'27.50',chg:'+1.1%',up:true,
+   alert:'Industrial and safe-haven demand. Solar panel demand boosting long-term outlook.',
+   geo_weight:{war:0.7,sanction:0.6,supply:0.4,trade:0.5,geo:0.7},
+   producers:[{n:'Mexico',v:196,m:220},{n:'China',v:110,m:130},{n:'Peru',v:95,m:110},{n:'Russia',v:42,m:55},{n:'Australia',v:39,m:50}],
+   base:27,trend:[0.2,-0.1,0.3,0.1,-0.2,0.4,-0.1,0.2,0.1,-0.1,0.3,-0.2,0.1,0.2,-0.1,0.3,0.1,-0.2,0.2,0.1,-0.1,0.2,-0.1,0.3,0.1,0.2,-0.1,0.2,0.1,0.3]},
+  {id:'copper',name:'Copper',cat:'Metals',unit:'$/lb',ticker:'HG=F',color:'#993C1D',price:'4.23',chg:'-0.3%',up:false,
+   alert:'China demand slowdown weighing on prices. Supply disruptions in Chile and Peru partially offsetting.',
+   geo_weight:{war:0.4,sanction:0.5,supply:0.8,trade:0.9,geo:0.5},
+   producers:[{n:'Chile',v:5500,m:6000},{n:'Peru',v:2800,m:3200},{n:'China',v:1900,m:2200},{n:'DRC',v:1800,m:2100},{n:'USA',v:1200,m:1400}],
+   base:4.2,trend:[0.02,-0.01,0.03,-0.02,0.01,0.04,-0.02,0.01,-0.03,0.02,0.01,-0.02,0.03,-0.01,0.02,0.01,-0.02,0.03,-0.01,0.02,0.01,-0.01,0.02,-0.02,0.01,0.03,-0.01,0.02,0.01,0.02]},
+  {id:'platinum',name:'Platinum',cat:'Metals',unit:'$/oz',ticker:'PL=F',color:'#444441',price:'985',chg:'+0.4%',up:true,
+   alert:'Automotive demand recovering. South Africa supply risk due to energy constraints.',
+   geo_weight:{war:0.5,sanction:0.6,supply:0.7,trade:0.4,geo:0.5},
+   producers:[{n:'South Africa',v:4300,m:4800},{n:'Russia',v:680,m:750},{n:'Zimbabwe',v:480,m:520},{n:'Canada',v:220,m:250},{n:'USA',v:135,m:160}],
+   base:980,trend:[1,-0.5,2,0.5,-1,1.5,-0.5,1,0.5,-0.5,1.5,-1,0.5,1,-0.5,1,0.5,-1,1.5,0.5,-0.5,1,-0.5,1,0.5,1,-0.5,1.5,0.5,1]},
+  {id:'palladium',name:'Palladium',cat:'Metals',unit:'$/oz',ticker:'PA=F',color:'#3C3489',price:'1020',chg:'-1.2%',up:false,
+   alert:'Russia sanctions risk on supply — Russia produces ~40% of global palladium. EV transition reducing automotive demand.',
+   geo_weight:{war:0.6,sanction:0.9,supply:0.7,trade:0.4,geo:0.5},
+   producers:[{n:'Russia',v:2600,m:2900},{n:'South Africa',v:2400,m:2700},{n:'Canada',v:210,m:240},{n:'USA',v:150,m:180},{n:'Zimbabwe',v:120,m:150}],
+   base:1030,trend:[-1,0.5,-2,1,-0.5,-1.5,0.5,-1,0.5,1,-1.5,0.5,-1,0.5,-0.5,-1,0.5,-0.5,-1,0.5,0.5,-1,0.5,-0.5,-1,0.5,-0.5,-1.5,0.5,-1]},
+  // ENERGY
+  {id:'brent',name:'Brent Crude',cat:'Energy',unit:'$/bbl',ticker:'BZ=F',color:'#D85A30',price:'82.40',chg:'+1.2%',up:true,
+   alert:'Red Sea disruptions adding ~$4 risk premium. Libya force majeure active. OPEC+ cut extension under discussion.',
+   geo_weight:{war:1.0,sanction:0.9,supply:1.0,trade:0.7,geo:0.8},
+   producers:[{n:'USA',v:13.1,m:14},{n:'Saudi Arabia',v:10.8,m:12},{n:'Russia',v:9.2,m:12},{n:'Iraq',v:4.5,m:6},{n:'UAE',v:3.8,m:6}],
+   base:82,trend:[-0.3,0.8,-0.5,1.1,0.4,-0.8,1.5,0.6,-0.4,1.8,0.3,-1.0,0.7,1.2,-0.3,0.9,1.4,-0.6,0.4,2.1,-0.2,0.8,1.0,-0.5,0.6,1.3,-0.1,0.5,1.1,0.7]},
+  {id:'wti',name:'WTI Crude',cat:'Energy',unit:'$/bbl',ticker:'CL=F',color:'#BA7517',price:'78.20',chg:'+0.9%',up:true,
+   alert:'Tracks Brent with slight discount. US shale production at record highs partially cushioning supply risks.',
+   geo_weight:{war:0.9,sanction:0.9,supply:1.0,trade:0.7,geo:0.8},
+   producers:[{n:'USA',v:13.1,m:14},{n:'Saudi Arabia',v:10.8,m:12},{n:'Russia',v:9.2,m:12},{n:'Canada',v:5.8,m:6.5},{n:'Iraq',v:4.5,m:6}],
+   base:78,trend:[-0.2,0.7,-0.4,1.0,0.3,-0.7,1.4,0.5,-0.3,1.7,0.2,-0.9,0.6,1.1,-0.2,0.8,1.3,-0.5,0.3,2.0,-0.1,0.7,0.9,-0.4,0.5,1.2,-0.1,0.4,1.0,0.6]},
+  {id:'natgas',name:'Nat. Gas',cat:'Energy',unit:'$/MMBtu',ticker:'NG=F',color:'#185FA5',price:'2.91',chg:'-0.8%',up:false,
+   alert:'European storage 68% — below 5yr avg. LNG demand surge from Asia pressuring US export capacity.',
+   geo_weight:{war:0.7,sanction:0.8,supply:0.9,trade:0.6,geo:0.6},
+   producers:[{n:'USA',v:103,m:110},{n:'Russia',v:58,m:85},{n:'Iran',v:26,m:35},{n:'Qatar',v:18,m:22},{n:'China',v:22,m:28}],
+   base:2.9,trend:[0.05,-0.03,0.04,0.07,-0.04,0.08,-0.02,0.03,-0.05,0.06,0.02,-0.01,0.04,-0.03,0.07,0.01,-0.03,0.05,0.02,-0.01,0.05,-0.02,0.03,0.04,-0.02,0.03,-0.03,0.06,0.01,0.04]},
+  {id:'heatingoil',name:'Heating Oil',cat:'Energy',unit:'$/gal',ticker:'HO=F',color:'#3B6D11',price:'2.68',chg:'-0.5%',up:false,
+   alert:'Seasonal demand softening. Refinery margins impacted by crude price volatility.',
+   geo_weight:{war:0.7,sanction:0.7,supply:0.8,trade:0.5,geo:0.5},
+   producers:[{n:'USA',v:420,m:460},{n:'Russia',v:260,m:310},{n:'S. Korea',v:180,m:200},{n:'India',v:155,m:180},{n:'China',v:140,m:165}],
+   base:2.7,trend:[0.02,-0.01,0.02,-0.01,0.01,-0.02,0.01,0.02,-0.01,0.01,0.02,-0.01,0.01,-0.02,0.01,0.02,-0.01,0.01,0.02,-0.01,0.01,-0.02,0.02,-0.01,0.01,0.02,-0.01,0.01,-0.02,0.01]},
+  // GRAINS
+  {id:'wheat',name:'Wheat',cat:'Grains',unit:'$/bushel',ticker:'ZW=F',color:'#BA7517',price:'5.82',chg:'+3.1%',up:true,
+   alert:'Ukraine Odesa attacks threaten 10% of global exports. India export ban extended. Food inflation risk elevated.',
+   geo_weight:{war:0.9,sanction:0.5,supply:0.8,trade:0.9,geo:0.4},
+   producers:[{n:'China',v:136,m:145},{n:'EU',v:138,m:150},{n:'India',v:103,m:115},{n:'Russia',v:92,m:100},{n:'USA',v:44,m:55}],
+   base:5.7,trend:[-0.1,0.05,-0.15,0.25,-0.05,0.1,0,-0.2,0.15,0.05,-0.1,0.2,-0.05,0.1,-0.15,0.05,0.25,-0.1,0,0.15,-0.05,0.1,-0.15,0.2,0,0.05,-0.1,0.15,0.05,-0.05]},
+  {id:'corn',name:'Corn',cat:'Grains',unit:'$/bushel',ticker:'ZC=F',color:'#854F0B',price:'4.65',chg:'+0.8%',up:true,
+   alert:'Ukraine war impacting Black Sea exports. US crop conditions mixed. Ethanol demand supporting prices.',
+   geo_weight:{war:0.8,sanction:0.4,supply:0.7,trade:0.8,geo:0.3},
+   producers:[{n:'USA',v:387,m:410},{n:'China',v:277,m:300},{n:'Brazil',v:137,m:155},{n:'EU',v:67,m:75},{n:'Argentina',v:55,m:65}],
+   base:4.6,trend:[0.02,-0.01,0.03,0.01,-0.02,0.03,-0.01,0.02,0.01,-0.01,0.03,-0.02,0.01,0.02,-0.01,0.02,0.01,-0.02,0.03,0.01,-0.01,0.02,-0.01,0.02,0.01,0.02,-0.01,0.02,0.01,0.02]},
+  {id:'soybeans',name:'Soybeans',cat:'Grains',unit:'$/bushel',ticker:'ZS=F',color:'#3B6D11',price:'11.85',chg:'+0.5%',up:true,
+   alert:'South American harvest expectations strong. China demand uncertain amid trade tensions.',
+   geo_weight:{war:0.5,sanction:0.5,supply:0.6,trade:1.0,geo:0.4},
+   producers:[{n:'Brazil',v:162,m:175},{n:'USA',v:121,m:135},{n:'Argentina',v:50,m:60},{n:'China',v:20,m:25},{n:'India',v:13,m:16}],
+   base:11.8,trend:[0.05,-0.02,0.08,0.03,-0.04,0.06,-0.02,0.04,0.02,-0.03,0.07,-0.03,0.02,0.05,-0.02,0.04,0.03,-0.04,0.06,0.02,-0.02,0.04,-0.02,0.05,0.02,0.04,-0.02,0.05,0.02,0.04]},
+  {id:'rice',name:'Rough Rice',cat:'Grains',unit:'$/cwt',ticker:'ZR=F',color:'#0F6E56',price:'17.20',chg:'+1.4%',up:true,
+   alert:'India export ban — world\'s largest rice exporter at 40% of global trade — driving global prices sharply higher.',
+   geo_weight:{war:0.4,sanction:0.3,supply:0.6,trade:1.0,geo:0.3},
+   producers:[{n:'China',v:212,m:225},{n:'India',v:195,m:210},{n:'Indonesia',v:55,m:62},{n:'Bangladesh',v:38,m:44},{n:'Vietnam',v:43,m:48}],
+   base:17,trend:[0.05,0.1,0.08,0.12,0.06,0.09,0.04,0.11,0.07,0.08,0.05,0.10,0.06,0.09,0.07,0.08,0.06,0.10,0.05,0.09,0.07,0.08,0.06,0.09,0.05,0.08,0.07,0.09,0.06,0.08]},
+  // SOFTS
+  {id:'coffee',name:'Coffee',cat:'Softs',unit:'$/lb',ticker:'KC=F',color:'#412402',price:'2.15',chg:'+0.7%',up:true,
+   alert:'Brazil drought concerns. Vietnam supply below expectations. Logistics disruptions via Red Sea adding cost.',
+   geo_weight:{war:0.3,sanction:0.2,supply:0.7,trade:0.6,geo:0.2},
+   producers:[{n:'Brazil',v:69,m:75},{n:'Vietnam',v:29,m:33},{n:'Colombia',v:14,m:16},{n:'Indonesia',v:11,m:13},{n:'Honduras',v:8,m:9}],
+   base:2.1,trend:[0.01,-0.005,0.015,0.005,-0.01,0.015,-0.005,0.01,0.005,-0.005,0.015,-0.01,0.005,0.01,-0.005,0.01,0.005,-0.01,0.015,0.005,-0.005,0.01,-0.005,0.01,0.005,0.01,-0.005,0.01,0.005,0.01]},
+  {id:'sugar',name:'Sugar',cat:'Softs',unit:'$/lb',ticker:'SB=F',color:'#185FA5',price:'0.2280',chg:'-1.2%',up:false,
+   alert:'Brazil production recovery weighing on prices. El Nino weather risk in Asia.',
+   geo_weight:{war:0.2,sanction:0.2,supply:0.6,trade:0.5,geo:0.2},
+   producers:[{n:'Brazil',v:42,m:46},{n:'India',v:36,m:40},{n:'EU',v:17,m:19},{n:'Thailand',v:11,m:13},{n:'China',v:10,m:12}],
+   base:0.23,trend:[0.001,-0.002,0.001,-0.001,0.002,-0.003,0.001,-0.001,0.002,-0.001,-0.002,0.001,0.002,-0.001,0.001,-0.002,0.001,0.002,-0.001,0.001,-0.002,0.001,0.001,-0.002,0.001,0.002,-0.001,0.001,-0.002,0.001]},
+  {id:'cotton',name:'Cotton',cat:'Softs',unit:'$/lb',ticker:'CT=F',color:'#3C3489',price:'0.8450',chg:'+0.3%',up:true,
+   alert:'Pakistan floods reduced crop. China demand recovery uncertain. USD strength weighing.',
+   geo_weight:{war:0.4,sanction:0.4,supply:0.6,trade:0.7,geo:0.3},
+   producers:[{n:'China',v:6.4,m:7},{n:'India',v:6.2,m:7},{n:'USA',v:3.7,m:4.2},{n:'Brazil',v:3.1,m:3.5},{n:'Pakistan',v:1.3,m:1.8}],
+   base:0.84,trend:[0.002,-0.001,0.003,0.001,-0.002,0.003,-0.001,0.002,0.001,-0.001,0.003,-0.002,0.001,0.002,-0.001,0.002,0.001,-0.002,0.003,0.001,-0.001,0.002,-0.001,0.002,0.001,0.002,-0.001,0.002,0.001,0.002]},
+  {id:'cocoa',name:'Cocoa',cat:'Softs',unit:'$/MT',ticker:'CC=F',color:'#633806',price:'9850',chg:'+2.1%',up:true,
+   alert:'West Africa crop disease devastating Ivory Coast and Ghana output — combined 60% of global supply.',
+   geo_weight:{war:0.2,sanction:0.2,supply:0.9,trade:0.4,geo:0.3},
+   producers:[{n:'Ivory Coast',v:2200,m:2500},{n:'Ghana',v:1000,m:1200},{n:'Indonesia',v:660,m:750},{n:'Nigeria',v:290,m:340},{n:'Cameroon',v:270,m:310}],
+   base:9600,trend:[20,-10,30,15,-20,40,-10,20,10,-10,35,-20,10,25,-10,20,15,-25,40,10,-10,25,-10,30,10,20,-10,30,10,20]},
+  // MEATS
+  {id:'cattle',name:'Live Cattle',cat:'Meats',unit:'$/lb',ticker:'LE=F',color:'#D85A30',price:'1.8650',chg:'+0.5%',up:true,
+   alert:'US herd at historic lows. Feed costs elevated. Strong export demand from Asia.',
+   geo_weight:{war:0.2,sanction:0.3,supply:0.5,trade:0.6,geo:0.2},
+   producers:[{n:'USA',v:12.7,m:14},{n:'Brazil',v:10.1,m:11.5},{n:'EU',v:7.8,m:8.5},{n:'China',v:7.5,m:8.5},{n:'Argentina',v:3.2,m:3.8}],
+   base:1.85,trend:[0.005,-0.002,0.008,0.003,-0.004,0.007,-0.002,0.005,0.002,-0.003,0.007,-0.004,0.002,0.005,-0.002,0.005,0.003,-0.004,0.007,0.002,-0.002,0.005,-0.002,0.005,0.002,0.005,-0.002,0.006,0.002,0.004]},
+  {id:'hogs',name:'Lean Hogs',cat:'Meats',unit:'$/lb',ticker:'HE=F',color:'#993556',price:'0.8820',chg:'-0.8%',up:false,
+   alert:'Seasonal demand softening. China ASF disease risk creating supply uncertainty.',
+   geo_weight:{war:0.2,sanction:0.3,supply:0.5,trade:0.6,geo:0.2},
+   producers:[{n:'China',v:57,m:63},{n:'EU',v:24,m:27},{n:'USA',v:13,m:14.5},{n:'Brazil',v:5.1,m:5.8},{n:'Russia',v:4.5,m:5.2}],
+   base:0.89,trend:[0.003,-0.005,0.002,-0.004,0.003,-0.005,0.002,-0.003,0.004,-0.004,-0.002,0.003,0.002,-0.004,0.003,-0.002,0.003,-0.004,0.002,0.003,-0.003,0.002,0.003,-0.003,0.002,0.003,-0.003,0.002,-0.004,0.002]}
+];
+
+// ── STATE ──────────────────────────────────────────────────────────
+let activeCom = 'brent';
+let activeCat = 'All';
+let currentNews = [];
+let expandedLb = null;
+
+// ── TAB SWITCH ─────────────────────────────────────────────────────
+function switchTab(t) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('[onclick="switchTab(\''+t+'\')"]').classList.add('active');
+  document.getElementById(t+'-panel').classList.add('active');
+}
+
+// ── COMMODITY RELEVANCE SCORES PER EVENT ──────────────────────────
+function comRelevance(com, news) {
+  const w = com.geo_weight[news.tag] || 0.3;
+  const sevScore = SEV[news.sev] ? SEV[news.sev].score : 4;
+  // boost if commodity name appears in title
+  const titleHit = news.title.toLowerCase().includes(com.name.toLowerCase()) ||
+    (com.id === 'brent' && news.title.toLowerCase().match(/oil|crude|opec|tanker|barrel/)) ||
+    (com.id === 'wti' && news.title.toLowerCase().match(/oil|crude|opec|barrel/)) ||
+    (com.id === 'natgas' && news.title.toLowerCase().match(/gas|lng|pipeline/)) ||
+    (com.id === 'wheat' && news.title.toLowerCase().match(/wheat|grain|odesa|ukraine.*food/)) ||
+    (com.id === 'gold' && news.title.toLowerCase().match(/gold|safe.haven|conflict|war/)) ||
+    (com.id === 'rice' && news.title.toLowerCase().match(/rice|india.*export|food/));
+  const boost = titleHit ? 1.4 : 1.0;
+  return Math.round(w * sevScore * boost * 10) / 10;
+}
+
+function getCommodityPressure(com) {
+  if (!currentNews.length) return 0;
+  const total = currentNews.reduce((s, n) => s + comRelevance(com, n), 0);
+  return Math.round(Math.min(total / currentNews.length * 1.5, 10) * 10) / 10;
+}
+
+function getCommodityEvents(com) {
+  return currentNews
+    .map(n => ({news: n, impact: comRelevance(com, n)}))
+    .filter(x => x.impact >= 1.5)
+    .sort((a, b) => b.impact - a.impact)
+    .slice(0, 4);
+}
+
+// ── NEWS ──────────────────────────────────────────────────────────
+const FALLBACK_NEWS = [
+  {title:'US-Iran ceasefire holds week 3 — Oman talks on enrichment cap continuing',tag:'geo',src:'Reuters',age:'2h ago',sev:'high',url:'https://www.reuters.com',
+   affected:[{c:'Crude',d:'down'},{c:'Gold',d:'down'},{c:'Freight',d:'down'}],
+   prompt:'The US-Iran ceasefire is holding at 3 weeks with Oman mediating talks on enrichment cap. Analyze probability-weighted scenarios for crude oil, gold, and freight rates over the next 30 days. Model full resolution vs re-escalation.'},
+  {title:'Houthi strikes resume — 2 container ships hit, Maersk suspends Red Sea routes again',tag:'war',src:'Lloyd List',age:'4h ago',sev:'critical',url:'https://www.ft.com',
+   affected:[{c:'Freight',d:'up'},{c:'Crude',d:'up'},{c:'LNG',d:'up'}],
+   prompt:'Houthis struck 2 container ships post-ceasefire and Maersk suspended Red Sea routes again. Analyze freight rate trajectory, Indian export cost transmission, and which Indian listed companies face margin pressure from renewed Red Sea risk.'},
+  {title:'US 145% tariff on China — IMF cuts 2026 global growth to 2.3%',tag:'trade',src:'WSJ',age:'8h ago',sev:'critical',url:'https://www.wsj.com',
+   affected:[{c:'Gold',d:'up'},{c:'Crude',d:'down'},{c:'Copper',d:'down'}],
+   prompt:'US 145% tariff on all Chinese goods, China 125% retaliation, IMF cuts global growth to 2.3%. Cross-check: is gold actually performing as safe-haven? Is copper falling on demand destruction fears? Give India-specific trade diversion opportunity vs Chinese dumping risk analysis.'},
+  {title:'Gold crosses $3,280 — central bank buying accelerates, de-dollarisation at 23%',tag:'geo',src:'Bloomberg',age:'12h ago',sev:'high',url:'https://www.bloomberg.com',
+   affected:[{c:'Gold',d:'up'},{c:'USD',d:'down'}],
+   prompt:'Gold at $3,280 with central bank buying at record pace and dollar share of global trade at 46%. Is gold still the right safe-haven or is it overbought? Analyze the de-dollarisation thesis, BRICS demand, and what the India gold MCX level implies.'},
+  {title:'RBI cuts repo to 6.0% with accommodative stance — June cut signalled',tag:'trade',src:'RBI',age:'1d ago',sev:'moderate',url:'https://www.rbi.org.in',
+   affected:[{c:'INR',d:'up'}],
+   prompt:'RBI cut 25bp to 6.0% with accommodative stance on April 9. Analyze the rate cut transmission into equity markets — housing finance, NBFCs, auto, and PSU banks. What does accommodative stance signal about the June meeting?'},
+  {title:'China seizes Philippines supply mission at Second Thomas Shoal — US 7th Fleet responds',tag:'geo',src:'SCMP',age:'2d ago',sev:'critical',url:'https://www.scmp.com',
+   affected:[{c:'Crude',d:'up'},{c:'Gold',d:'up'}],
+   prompt:'China seized Philippines supply mission at Second Thomas Shoal with US 7th Fleet activating FONOPS within 12nm. Analyze Taiwan Strait escalation risk spillover, TSMC supply chain vulnerability, and what this means for Indian defence sector and semiconductor import diversification.'},
+  {title:'Ukraine — Russia recaptures Kursk, strikes Sumy with drones',tag:'war',src:'AP',age:'2d ago',sev:'high',url:'https://apnews.com',
+   affected:[{c:'Wheat',d:'up'},{c:'Gas',d:'up'},{c:'Gold',d:'up'}],
+   prompt:'Russia recaptured Kursk Oblast and is striking Sumy with Shahed drones. NATO activated Article 4. Analyze European nat gas TTF trajectory, wheat corridor risk, gold safe-haven performance, and whether Indian steel exports are affected by European demand dynamics.'},
+  {title:'India SPR full — 5.33 MMT stored, Phase 2 expansion approved',tag:'supply',src:'PIB',age:'3d ago',sev:'low',url:'https://www.pib.gov.in',
+   affected:[{c:'Crude',d:'down'}],
+   prompt:'India filled its Strategic Petroleum Reserve at $89 Brent. Analyze what SPR completion means for India energy security vulnerability in the next oil shock. What does Phase 2 expansion signal about government crude price expectations? Model OMC re-rating on improved energy security.'},
+];
+
+async function loadNews() {
+  try {
+    const res = await fetch(BACKEND_URL+'/api/news');
+    const data = await res.json();
+    if (data.news && data.news.length > 0) {
+      currentNews = data.news;
+      document.getElementById('news-dot').className = 's-dot s-green';
+      const t = new Date(data.lastFetched).toLocaleTimeString();
+      document.getElementById('news-status').textContent = data.news.length+' live events · '+t;
+      document.getElementById('live-label').textContent = 'Live';
+    } else throw new Error('empty');
+  } catch {
+    currentNews = FALLBACK_NEWS;
+    document.getElementById('news-dot').className = 's-dot s-amber';
+    document.getElementById('news-status').textContent = 'Backend not connected — showing reference events';
+    document.getElementById('live-label').textContent = 'Demo';
+  }
+  renderNews();
+  renderDashboard();
+  renderLeaderboard();
+  renderComGrid();
+}
+
+function renderNews() {
+  document.getElementById('news-list').innerHTML = currentNews.map((n,i)=>
+    '<div class="news-item sev-'+n.sev+'" onclick="selectNews('+i+')">' +
+    '<div class="news-top"><span class="news-tag tag-'+n.tag+'">'+n.tag+'</span>' +
+    '<div class="sev-badge '+n.sev+'"><div class="sev-dot-sm '+n.sev+'"></div>'+SEV[n.sev].label+'</div></div>' +
+    '<div class="news-title">'+n.title+'</div>' +
+    '<div class="news-bottom"><div class="news-meta">'+n.src+' · '+n.age+'</div>' +
+    '<div class="impact-pills">'+n.affected.map(a=>'<span class="impact-pill pill-'+a.d+'">'+(a.d==='up'?'▲':'▼')+' '+a.c+'</span>').join('')+'</div></div>' +
+    '<div class="news-actions">' +
+    '<button class="btn-analyze" onclick="event.stopPropagation();selectNews('+i+')">Analyze vs market ↗</button>' +
+    '<a class="btn-source" href="'+(n.url||'#')+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Read source ↗</a>' +
+    '</div></div>'
+  ).join('');
+}
+
+function renderDashboard() {
+  const counts = {critical:0,high:0,moderate:0,low:0};
+  currentNews.forEach(n=>counts[n.sev]=(counts[n.sev]||0)+1);
+  const total = currentNews.length||1;
+  const score = currentNews.reduce((s,n)=>s+(SEV[n.sev]?SEV[n.sev].score:4),0)/total;
+  const r = Math.round(score*10)/10;
+  const col = score>=8?'var(--red)':score>=6?'var(--coral)':score>=4?'var(--amber)':'var(--green)';
+  const lbl = score>=8?'Critical':score>=6?'Elevated':score>=4?'Moderate':'Low';
+  document.getElementById('risk-num').textContent=r;
+  document.getElementById('risk-num').style.color=col;
+  document.getElementById('risk-bar').style.width=(score*10)+'%';
+  document.getElementById('risk-bar').style.background=col;
+  document.getElementById('risk-lbl').textContent=lbl;
+  document.getElementById('risk-lbl').style.color=col;
+  document.getElementById('sev-breakdown').innerHTML=['critical','high','moderate','low'].map(s=>
+    '<div class="sev-row"><div class="sev-lbl" style="color:'+SEV[s].color+'">'+SEV[s].label+'</div>' +
+    '<div class="sev-track"><div class="sev-fill" style="width:'+Math.round((counts[s]||0)/total*100)+'%;background:'+SEV[s].color+'"></div></div>' +
+    '<div class="sev-cnt">'+(counts[s]||0)+'</div></div>'
+  ).join('');
+  const exp={};
+  currentNews.forEach(n=>n.affected.forEach(a=>{
+    if(!exp[a.c])exp[a.c]={up:0,dn:0,sev:0};
+    exp[a.c][a.d=='up'?'up':'dn']++;exp[a.c].sev+=(SEV[n.sev]?SEV[n.sev].score:4);
+  }));
+  const sorted=Object.entries(exp).sort((a,b)=>b[1].sev-a[1].sev).slice(0,5);
+  const maxS=sorted[0]?.[1]?.sev||1;
+  document.getElementById('exposure-list').innerHTML=sorted.map(([name,e])=>
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">' +
+    '<div style="width:52px;font-size:11px;color:var(--text2);font-weight:500">'+name+'</div>' +
+    '<div style="flex:1;background:var(--bg2);border-radius:3px;height:10px;overflow:hidden">' +
+    '<div style="width:'+Math.round(e.sev/maxS*100)+'%;height:100%;background:'+(e.up>e.dn?'var(--coral)':'var(--blue)')+';border-radius:3px"></div></div>' +
+    '<div style="font-size:10px;color:var(--text3);width:36px;text-align:right">'+(e.up>0?'▲'+e.up:'')+(e.dn>0?' ▼'+e.dn:'')+'</div></div>'
+  ).join('');
+}
+
+function selectNews(i) {
+  const n = currentNews[i];
+  showAnalysis(n.title, n.prompt, n.sev);
+}
+
+function analyzeCustom() {
+  const val = document.getElementById('custom-input').value.trim();
+  if(!val) return;
+  showAnalysis(val, 'Rate the severity and analyze the commodity and market impact of this event: "'+val+'". Cross-check theory with actual price data provided. Give severity score /10, commodity directions vs actual market, market reality check, and risk level.', null);
+}
+
+function buildMarketSnapshot() {
+  // Build a real-time snapshot of commodity prices + changes for context
+  return COMMODITIES.map(c => {
+    const live = livePrices[c.id];
+    const price = live ? live.price : c.price;
+    const chg   = live ? live.chg   : c.chg;
+    const dir   = live ? (live.up ? '▲' : '▼') : (c.up ? '▲' : '▼');
+    return `  • ${c.name} (${c.unit}): ${price}  ${dir} ${chg}`;
+  }).join('\n');
+}
+
+function showAnalysis(title, prompt, sev) {
+  const box = document.getElementById('analysis-box');
+  box.style.display = 'block';
+  document.getElementById('analysis-title').textContent = title;
+  const bodyEl = document.getElementById('analysis-body');
+  box.scrollIntoView({behavior:'smooth', block:'nearest'});
+
+  const sevCtx = sev ? 'Severity classification: ' + sev.toUpperCase() + '.\n' : '';
+  const snapshot = buildMarketSnapshot();
+
+  const fullPrompt =
+    'You are a senior commodity and geopolitical risk analyst at a macro hedge fund. Your edge is that you ground every analysis in ACTUAL market data — not just theory.\n\n' +
+    sevCtx +
+    'EVENT TO ANALYZE:\n' + prompt + '\n\n' +
+    'CURRENT MARKET PRICES (live or reference):\n' + snapshot + '\n\n' +
+    'CRITICAL INSTRUCTION — Market Reality Check:\n' +
+    'For each commodity you discuss, explicitly compare the THEORETICAL impact of this event against what the ACTUAL price data above shows. ' +
+    'If a commodity is falling despite a bullish geopolitical catalyst (e.g. gold falling despite war), you MUST explain the real-world forces overriding the theory (e.g. USD strength, profit-taking, positioning, macro headwinds). ' +
+    'Never just state the textbook relationship. Always reconcile theory vs reality.\n\n' +
+    'Reply in this exact format:\n\n' +
+    'SUMMARY:\n[2 sentences — what happened and the key market context right now]\n\n' +
+    'COMMODITIES AFFECTED:\n' +
+    '• [Name]: [THEORY: UP/DOWN] vs [ACTUAL: UP/DOWN/FLAT] — [explain the gap or confirmation between theory and actual price action]\n' +
+    '• [repeat for each relevant commodity]\n\n' +
+    'MARKET REALITY CHECK:\n[1-2 sentences on what macro or positioning forces are dominating over the geopolitical signal]\n\n' +
+    'MARKET IMPACT:\n[one sentence on equities, bonds, FX]\n\n' +
+    'RISK: [LOW/MODERATE/HIGH/CRITICAL] — [reason]\n\n' +
+    'WATCH:\n[one leading indicator or price level to monitor for confirmation or reversal]';
+
+  const claudeUrl = 'https://claude.ai/new?q=' + encodeURIComponent(fullPrompt);
+
+  bodyEl.innerHTML =
+    '<div style="background:var(--blue-bg);border:0.5px solid var(--blue-text);border-radius:10px;padding:16px 18px">' +
+    '<div style="font-size:12px;font-weight:600;color:var(--blue-text);margin-bottom:6px">Analysis ready — with live market context</div>' +
+    '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;line-height:1.65">' +
+    'Pre-built prompt for <strong style="color:var(--text)">' + title.substring(0,80) + (title.length>80?'…':'') + '</strong> includes current market prices for all 19 commodities so Claude can cross-check theory vs actual price action.' +
+    '</div>' +
+    '<div style="background:var(--bg);border:0.5px solid var(--border);border-radius:7px;padding:10px 13px;margin-bottom:12px;font-size:10px;color:var(--text3);line-height:1.7">' +
+    '<span style="font-weight:600;color:var(--text2)">Market snapshot included in prompt:</span><br>' +
+    COMMODITIES.slice(0,6).map(c=>{const l=livePrices[c.id];const p=l?l.price:c.price;const chg=l?l.chg:c.chg;const up=l?l.up:c.up;return '<span style="color:'+(up?'var(--green)':'var(--red)')+'">'+c.name+' '+p+' '+(up?'▲':'▼')+chg+'</span>';}).join('  ·  ') +
+    '  <span style="color:var(--text3)">+ '+(COMMODITIES.length-6)+' more</span>' +
+    '</div>' +
+    '<a href="' + claudeUrl + '" target="_blank" rel="noopener" ' +
+    'style="display:inline-flex;align-items:center;gap:6px;padding:9px 20px;background:var(--blue);color:#fff;border-radius:8px;font-size:12px;font-weight:500;text-decoration:none">' +
+    'Open market-aware analysis in Claude.ai ↗' +
+    '</a>' +
+    '<div style="margin-top:8px;font-size:10px;color:var(--text3)">Opens in new tab · Free · Includes live price context</div>' +
+    '</div>';
+}
+
+function formatAnalysis(text) {
+  const h=t=>'<div style="font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin:10px 0 4px">'+t+'</div>';
+  const riskMap={CRITICAL:['var(--red-bg)','var(--red-text)'],HIGH:['var(--coral-bg)','var(--coral-text)'],MODERATE:['var(--amber-bg)','var(--amber-text)'],LOW:['var(--green-bg)','var(--green-text)']};
+  let html=text
+    .replace(/SUMMARY:/g,h('Summary'))
+    .replace(/COMMODITIES AFFECTED:/g,h('Commodities affected'))
+    .replace(/MARKET IMPACT:/g,h('Market impact'))
+    .replace(/WATCH:/g,h('Watch'))
+    .replace(/[•\-] ([\w\s.\/\-]+):\s*(UP)/g,'• <strong style="color:var(--text)">$1</strong>: <span style="color:var(--green);font-weight:600">▲ UP</span>')
+    .replace(/[•\-] ([\w\s.\/\-]+):\s*(DOWN)/g,'• <strong style="color:var(--text)">$1</strong>: <span style="color:var(--red);font-weight:600">▼ DOWN</span>')
+    .replace(/[•\-] ([\w\s.\/\-]+):\s*(NEUTRAL)/g,'• <strong style="color:var(--text)">$1</strong>: <span style="color:var(--text3);font-weight:600">— NEUTRAL</span>');
+  for(const [level,[bg,fg]] of Object.entries(riskMap)){
+    html=html.replace(new RegExp('RISK:\\s*'+level),h('Risk level')+'<span style="background:'+bg+';color:'+fg+';padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600">'+level+'</span>');
+  }
+  return '<div style="font-size:13px;line-height:1.75">'+html.split('\n').filter(l=>l.trim()).join('<br>')+'</div>';
+}
+
+// ── COMMODITY PANEL ───────────────────────────────────────────────
+function renderCatTabs() {
+  document.getElementById('cat-tabs').innerHTML = CATEGORIES.map(c=>
+    '<button class="cat-tab'+(c===activeCat?' active':'')+'" onclick="setCat(\''+c+'\')">'+c+'</button>'
+  ).join('');
+}
+
+function setCat(cat) {
+  activeCat=cat;
+  renderCatTabs();
+  renderComGrid();
+}
+
+function filteredComs() {
+  return activeCat==='All' ? COMMODITIES : COMMODITIES.filter(c=>c.cat===activeCat);
+}
+
+function renderComGrid() {
+  const coms = filteredComs();
+  document.getElementById('com-grid').innerHTML = coms.map(c=>{
+    const pressure = getCommodityPressure(c);
+    const pColor = pressure>=7?'var(--red)':pressure>=5?'var(--coral)':pressure>=3?'var(--amber)':'var(--green)';
+    const liveData = livePrices[c.id];
+    const displayPrice = liveData ? liveData.price : c.price;
+    const displayChg = liveData ? liveData.chg : c.chg;
+    const displayUp = liveData ? liveData.up : c.up;
+    return '<div class="com-card'+(c.id===activeCom?' selected':'')+'" onclick="selectCom(\''+c.id+'\')">'+
+      '<div class="com-name">'+c.name+'</div>'+
+      '<div class="com-price">'+displayPrice+'</div>'+
+      '<div class="com-unit">'+c.unit+(liveData?'  <span style="font-size:9px;color:var(--green);font-weight:500">● live</span>':'')+'</div>'+
+      '<div class="com-chg '+(displayUp?'up':'dn')+'">'+(displayUp?'▲':'▼')+' '+displayChg+'</div>'+
+      '<div class="com-pressure-bar"><div class="com-pressure-fill" style="width:'+Math.round(pressure*10)+'%;background:'+pColor+'"></div></div>'+
+      '</div>';
+  }).join('');
+}
+
+const TV_TICKERS = {
+  // METALS — true spot vs futures
+  gold:       { spot:'XAUUSD',        futures:'COMEX:GC1!',    spotLabel:'Spot (XAUUSD)',         futuresLabel:'Futures front month (GC1!)',    tv:'https://www.tradingview.com/chart/?symbol=COMEX%3AGC1!' },
+  silver:     { spot:'XAGUSD',        futures:'COMEX:SI1!',    spotLabel:'Spot (XAGUSD)',         futuresLabel:'Futures front month (SI1!)',    tv:'https://www.tradingview.com/chart/?symbol=COMEX%3ASI1!' },
+  copper:     { spot:'COMEX:HG1!',    futures:'COMEX:HG2!',    spotLabel:'Front month (HG1!)',    futuresLabel:'Next month (HG2!)',             tv:'https://www.tradingview.com/chart/?symbol=COMEX%3AHG1!' },
+  platinum:   { spot:'XPTUSD',        futures:'COMEX:PL1!',    spotLabel:'Spot (XPTUSD)',         futuresLabel:'Futures front month (PL1!)',    tv:'https://www.tradingview.com/chart/?symbol=COMEX%3APL1!' },
+  palladium:  { spot:'XPDUSD',        futures:'COMEX:PA1!',    spotLabel:'Spot (XPDUSD)',         futuresLabel:'Futures front month (PA1!)',    tv:'https://www.tradingview.com/chart/?symbol=COMEX%3APA1!' },
+  // ENERGY — spot CFDs vs futures
+  brent:      { spot:'UKOIL',         futures:'ICEEUR:BRN1!',  spotLabel:'Spot CFD (UKOIL)',      futuresLabel:'Futures front month (BRN1!)',   tv:'https://www.tradingview.com/chart/?symbol=ICEEUR%3ABRN1!' },
+  wti:        { spot:'USOIL',         futures:'NYMEX:CL1!',    spotLabel:'Spot CFD (USOIL)',      futuresLabel:'Futures front month (CL1!)',    tv:'https://www.tradingview.com/chart/?symbol=NYMEX%3ACL1!' },
+  natgas:     { spot:'NATGAS',        futures:'NYMEX:NG1!',    spotLabel:'Spot CFD (NATGAS)',     futuresLabel:'Futures front month (NG1!)',    tv:'https://www.tradingview.com/chart/?symbol=NYMEX%3ANG1!' },
+  heatingoil: { spot:'NYMEX:HO1!',    futures:'NYMEX:HO2!',    spotLabel:'Front month (HO1!)',    futuresLabel:'Next month (HO2!)',             tv:'https://www.tradingview.com/chart/?symbol=NYMEX%3AHO1!' },
+  // GRAINS — front month vs next month (no true spot market)
+  wheat:      { spot:'CBOT:ZW1!',     futures:'CBOT:ZW2!',     spotLabel:'Front month (ZW1!)',    futuresLabel:'Next month (ZW2!)',             tv:'https://www.tradingview.com/chart/?symbol=CBOT%3AZW1!' },
+  corn:       { spot:'CBOT:ZC1!',     futures:'CBOT:ZC2!',     spotLabel:'Front month (ZC1!)',    futuresLabel:'Next month (ZC2!)',             tv:'https://www.tradingview.com/chart/?symbol=CBOT%3AZC1!' },
+  soybeans:   { spot:'CBOT:ZS1!',     futures:'CBOT:ZS2!',     spotLabel:'Front month (ZS1!)',    futuresLabel:'Next month (ZS2!)',             tv:'https://www.tradingview.com/chart/?symbol=CBOT%3AZS1!' },
+  rice:       { spot:'CBOT:ZR1!',     futures:'CBOT:ZR2!',     spotLabel:'Front month (ZR1!)',    futuresLabel:'Next month (ZR2!)',             tv:'https://www.tradingview.com/chart/?symbol=CBOT%3AZR1!' },
+  // SOFTS — front month vs next month
+  coffee:     { spot:'ICEUS:KC1!',    futures:'ICEUS:KC2!',    spotLabel:'Front month (KC1!)',    futuresLabel:'Next month (KC2!)',             tv:'https://www.tradingview.com/chart/?symbol=ICEUS%3AKC1!' },
+  sugar:      { spot:'ICEUS:SB1!',    futures:'ICEUS:SB2!',    spotLabel:'Front month (SB1!)',    futuresLabel:'Next month (SB2!)',             tv:'https://www.tradingview.com/chart/?symbol=ICEUS%3ASB1!' },
+  cotton:     { spot:'ICEUS:CT1!',    futures:'ICEUS:CT2!',    spotLabel:'Front month (CT1!)',    futuresLabel:'Next month (CT2!)',             tv:'https://www.tradingview.com/chart/?symbol=ICEUS%3ACT1!' },
+  cocoa:      { spot:'ICEUS:CC1!',    futures:'ICEUS:CC2!',    spotLabel:'Front month (CC1!)',    futuresLabel:'Next month (CC2!)',             tv:'https://www.tradingview.com/chart/?symbol=ICEUS%3ACC1!' },
+  // MEATS — front month vs next month
+  cattle:     { spot:'CME:LE1!',      futures:'CME:LE2!',      spotLabel:'Front month (LE1!)',    futuresLabel:'Next month (LE2!)',             tv:'https://www.tradingview.com/chart/?symbol=CME%3ALE1!' },
+  hogs:       { spot:'CME:HE1!',      futures:'CME:HE2!',      spotLabel:'Front month (HE1!)',    futuresLabel:'Next month (HE2!)',             tv:'https://www.tradingview.com/chart/?symbol=CME%3AHE1!' },
+};
+
+function loadTVChart(containerId, symbol, theme) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const tvTheme = isDark ? 'dark' : 'light';
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'height:320px;width:100%';
+  container.appendChild(wrapper);
+  const script = document.createElement('script');
+  script.src = 'https://s3.tradingview.com/tv.js';
+  script.onload = function() {
+    new TradingView.widget({
+      container_id: wrapper.id || (wrapper.id = 'tv_' + containerId + '_' + Date.now()),
+      symbol: symbol,
+      interval: 'D',
+      timezone: 'Asia/Kolkata',
+      theme: tvTheme,
+      style: '1',
+      locale: 'en',
+      toolbar_bg: isDark ? '#242422' : '#f7f6f2',
+      enable_publishing: false,
+      hide_top_toolbar: false,
+      hide_legend: false,
+      save_image: false,
+      height: 320,
+      width: '100%',
+    });
+  };
+  if (window.TradingView) {
+    script.onload();
+  } else {
+    document.head.appendChild(script);
+  }
+}
+
+function selectCom(id) {
+  activeCom=id;
+  renderComGrid();
+  const c=COMMODITIES.find(x=>x.id===id);
+  const tv=TV_TICKERS[id];
+
+  document.getElementById('geo-alert').style.display='flex';
+  document.getElementById('geo-alert-text').textContent=c.alert;
+  renderProd(c);
+
+  if (tv) {
+    const tvSection = document.getElementById('tv-section');
+    tvSection.style.display = 'block';
+    document.getElementById('tv-title').textContent = c.name + ' — Live Charts';
+    document.getElementById('tv-spot-label').textContent = tv.spotLabel || c.name + ' — Live Price';
+    document.getElementById('tv-open-link').href = tv.tv;
+
+    document.getElementById('tv-spot-container').innerHTML = '<div class="tv-placeholder"><div class="spinner"></div>Loading chart…</div>';
+    setTimeout(() => loadTVChart('tv-spot-container', tv.spot, 'spot'), 100);
+
+    document.getElementById('chart-placeholder').style.display = 'none';
+    tvSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// Chart.js replaced by TradingView widgets
+
+function renderProd(c) {
+  const mx=Math.max(...c.producers.map(p=>p.m));
+  document.getElementById('prod-bars').innerHTML=c.producers.map(p=>
+    '<div class="prod-row"><div class="prod-lbl">'+p.n+'</div>' +
+    '<div class="prod-bg"><div class="prod-fill" style="width:'+Math.round(p.v/mx*100)+'%;background:'+c.color+'"></div></div>' +
+    '<div class="prod-val">'+p.v+'</div></div>'
+  ).join('');
+}
+
+// ── LEADERBOARD ───────────────────────────────────────────────────
+function renderLeaderboard() {
+  if(!currentNews.length) return;
+  const ranked = COMMODITIES.map(c=>({c, score:getCommodityPressure(c)}))
+    .sort((a,b)=>b.score-a.score).slice(0,10);
+  const maxScore = ranked[0]?.score||1;
+
+  document.getElementById('leaderboard-body').innerHTML = ranked.map((item,i)=>{
+    const {c,score} = item;
+    const barColor = score>=7?'var(--red)':score>=5?'var(--coral)':score>=3?'var(--amber)':'var(--green)';
+    const scoreColor = score>=7?'var(--red)':score>=5?'var(--coral)':score>=3?'var(--amber)':'var(--green)';
+    const rankClass = i===0?'r1':i===1?'r2':i===2?'r3':'';
+    return '<div class="lb-item" id="lb-'+c.id+'" onclick="toggleLb(\''+c.id+'\')">' +
+      '<div class="lb-rank '+rankClass+'">'+(i+1)+'</div>' +
+      '<div class="lb-name">'+c.name+'</div>' +
+      '<div class="lb-cat">'+c.cat+'</div>' +
+      '<div class="lb-bar-wrap"><div class="lb-bar-bg"><div class="lb-bar-fill" style="width:'+Math.round(score/maxScore*100)+'%;background:'+barColor+'"></div></div></div>' +
+      '<div class="lb-score" style="color:'+scoreColor+'">'+score.toFixed(1)+'</div>' +
+      '<div class="lb-arrow" id="lb-arrow-'+c.id+'">›</div>' +
+      '</div>' +
+      '<div class="lb-detail" id="lb-detail-'+c.id+'">' +
+      '<div class="lb-detail-title">Events driving pressure on '+c.name+'</div>' +
+      buildLbDetail(c) +
+      '</div>';
+  }).join('');
+}
+
+function buildLbDetail(c) {
+  const events = getCommodityEvents(c);
+  if(!events.length) return '<div style="color:var(--text3);font-size:11px">No significant events currently affecting this commodity.</div>';
+  return events.map(({news:n, impact})=>{
+    const impColor = impact>=7?'var(--red)':impact>=5?'var(--coral)':impact>=3?'var(--amber)':'var(--green)';
+    return '<div class="lb-event-row">' +
+      '<span class="lb-event-sev sev-badge '+n.sev+' '+n.sev+'">'+SEV[n.sev].label+'</span>' +
+      '<div class="lb-event-impact" style="color:'+impColor+'">'+impact.toFixed(1)+'</div>' +
+      '<div class="lb-event-text">'+n.title+'</div></div>';
+  }).join('');
+}
+
+function toggleLb(id) {
+  const detail = document.getElementById('lb-detail-'+id);
+  const arrow = document.getElementById('lb-arrow-'+id);
+  const item = document.getElementById('lb-'+id);
+  if(expandedLb && expandedLb!==id) {
+    document.getElementById('lb-detail-'+expandedLb).classList.remove('open');
+    document.getElementById('lb-arrow-'+expandedLb).classList.remove('open');
+    document.getElementById('lb-'+expandedLb).classList.remove('expanded');
+  }
+  const isOpen = detail.classList.contains('open');
+  detail.classList.toggle('open',!isOpen);
+  arrow.classList.toggle('open',!isOpen);
+  item.classList.toggle('expanded',!isOpen);
+  expandedLb = isOpen ? null : id;
+}
+
+// ── LIVE PRICES — TradingView ticker tape (no backend, no CORS) ───
+let livePrices = {};
+let tvPriceCount = 0;
+
+// TV symbol → commodity id  (using the same spot symbols already in TV_TICKERS)
+const TV_PRICE_MAP = {
+  'UKOIL':'brent',       'USOIL':'wti',         'NATGAS':'natgas',     'NYMEX:HO1!':'heatingoil',
+  'XAUUSD':'gold',       'XAGUSD':'silver',      'COMEX:HG1!':'copper', 'XPTUSD':'platinum',  'XPDUSD':'palladium',
+  'CBOT:ZW1!':'wheat',   'CBOT:ZC1!':'corn',     'CBOT:ZS1!':'soybeans','CBOT:ZR1!':'rice',
+  'ICEUS:KC1!':'coffee', 'ICEUS:SB1!':'sugar',   'ICEUS:CT1!':'cotton', 'ICEUS:CC1!':'cocoa',
+  'CME:LE1!':'cattle',   'CME:HE1!':'hogs',
+};
+
+function fmtPrice(p) {
+  if (p === null || p === undefined || isNaN(p)) return null;
+  if (p >= 1000) return p.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  if (p >= 100)  return p.toFixed(2);
+  if (p >= 10)   return p.toFixed(3);
+  return p.toFixed(4);
+}
+
+// TradingView ticker tape widget fires postMessage for every symbol it tracks.
+// We inject a hidden tape with all 19 symbols and harvest the price messages.
+function initTVPriceFeed() {
+  const dot    = document.getElementById('price-dot');
+  const status = document.getElementById('price-status');
+  dot.className = 's-dot s-amber';
+  status.textContent = 'Connecting to TradingView price feed…';
+
+  // Hidden container for the ticker tape widget
+  const wrap = document.createElement('div');
+  wrap.id = 'tv-price-feed';
+  wrap.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;pointer-events:none';
+  document.body.appendChild(wrap);
+
+  const symbols = Object.keys(TV_PRICE_MAP).map(sym => ({ proName: sym, title: TV_PRICE_MAP[sym] }));
+
+  // Listen for postMessage from TradingView widgets — they broadcast quote updates
+  window.addEventListener('message', function(e) {
+    if (!e.data || typeof e.data !== 'object') return;
+    // TV sends different message shapes — handle both ticker tape and widget formats
+    const d = e.data;
+
+    // Format 1: ticker tape quote update
+    if (d.name === 'quoteUpdate' && d.data) {
+      handleTVQuote(d.data.name || d.data.symbol, d.data);
+    }
+    // Format 2: widget chart symbol info
+    if (d.type === 'SYMBOL_RESOLVED' && d.data) {
+      handleTVQuote(d.data.name, d.data);
+    }
+    // Format 3: some versions emit {s:'SYMBOL', p:[price, chg]}
+    if (d.s && Array.isArray(d.p) && d.p.length >= 2) {
+      handleTVQuote(d.s, { lp: d.p[0], chp: d.p[1] });
+    }
+  });
+
+  // Inject the TradingView ticker tape widget (hidden)
+  const script = document.createElement('script');
+  script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js';
+  script.async = true;
+  script.innerHTML = JSON.stringify({
+    symbols,
+    showSymbolLogo: false,
+    colorTheme: 'light',
+    isTransparent: true,
+    displayMode: 'compact',
+    locale: 'en',
+  });
+  wrap.appendChild(script);
+
+  // Fallback: if after 8s we have fewer than 5 prices, show a warning
+  setTimeout(() => {
+    if (tvPriceCount < 5) {
+      dot.className = 's-dot s-amber';
+      status.textContent = 'TradingView feed partial (' + tvPriceCount + ' received) — reference prices shown for rest';
+      renderComGrid();
+    }
+  }, 8000);
+}
+
+function handleTVQuote(rawSymbol, data) {
+  if (!rawSymbol) return;
+  // Normalise symbol — TV sometimes sends with exchange prefix
+  const sym = rawSymbol.replace(/^.*:/, s => s); // keep full "EXCHANGE:SYM" form
+  const id  = TV_PRICE_MAP[rawSymbol] || TV_PRICE_MAP[sym] ||
+              TV_PRICE_MAP[rawSymbol.split(':').pop()]; // try without exchange prefix
+  if (!id) return;
+
+  // Price field names vary by widget version
+  const price = data.lp ?? data.last_price ?? data.close ?? data.price ?? null;
+  const pct   = data.chp ?? data.change_percent ?? data.changePercent ?? null;
+  if (price == null) return;
+
+  const up  = (pct ?? 0) >= 0;
+  const chg = pct != null ? ((up ? '+' : '') + Number(pct).toFixed(2) + '%') : '—';
+  livePrices[id] = { price: fmtPrice(Number(price)), chg, up };
+  tvPriceCount++;
+
+  // Update status and re-render as prices trickle in
+  const dot    = document.getElementById('price-dot');
+  const status = document.getElementById('price-status');
+  dot.className = 's-dot s-green';
+  status.textContent = tvPriceCount + ' live prices · TradingView · ' + new Date().toLocaleTimeString();
+  renderComGrid();
+  if (tvPriceCount >= Object.keys(TV_PRICE_MAP).length) renderLeaderboard();
+}
+
+function loadPrices() {
+  initTVPriceFeed();
+  // Refresh the feed every 5 minutes by re-injecting
+  setInterval(() => {
+    tvPriceCount = 0;
+    const old = document.getElementById('tv-price-feed');
+    if (old) old.remove();
+    initTVPriceFeed();
+  }, 5 * 60 * 1000);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────
+renderCatTabs();
+renderComGrid();
+selectCom('brent');
+loadNews();
+loadPrices();
+setInterval(loadNews,   30 * 60 * 1000);
+
+// ════════════════════════════════════════════════════════════════
+// AI ANALYSIS — proxied server-side via /api/analyze (Groq LLaMA 3.3)
+// Key lives only in Vercel env vars now, never in this file.
+// ════════════════════════════════════════════════════════════════
+
+async function groqAnalyze(title, prompt, sev) {
+  // Route analysis output to the active tab's own analysis box
+  const activePanel = document.querySelector('.panel.active');
+  const panelId = activePanel ? activePanel.id : 'geo-panel';
+  const prefix = panelId === 'war-panel' ? 'war-' : panelId === 'india-panel' ? 'india-' : '';
+  const boxId = prefix + 'analysis-box';
+  const titleId = prefix + 'analysis-title';
+  const bodyId = prefix + 'analysis-body';
+  const box = document.getElementById(boxId) || document.getElementById('analysis-box');
+  const titleEl = document.getElementById(titleId) || document.getElementById('analysis-title');
+  const bodyEl = document.getElementById(bodyId) || document.getElementById('analysis-body');
+  box.style.display = 'block';
+  titleEl.textContent = title;
+  box.scrollIntoView({behavior:'smooth', block:'nearest'});
+
+  bodyEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:var(--text3);font-size:12px"><div class="spinner"></div>Analyzing via Groq LLaMA 3.3...</div>';
+
+  const sevCtx = sev ? 'This is a ' + sev.toUpperCase() + ' severity event. ' : '';
+  const fullPrompt = 'You are a senior commodity and geopolitical risk analyst at a macro hedge fund. '
+    + sevCtx + prompt
+    + '\n\nReply in this exact format (no markdown, no preamble):\n\n'
+    + 'SUMMARY: [2 crisp sentences]\n\n'
+    + 'COMMODITIES AFFECTED:\n'
+    + '- [Name]: [UP/DOWN/NEUTRAL] - [reason]\n'
+    + '- [Name]: [UP/DOWN/NEUTRAL] - [reason]\n'
+    + '- [Name]: [UP/DOWN/NEUTRAL] - [reason]\n\n'
+    + 'MARKET IMPACT: [one sentence on equities, bonds, FX]\n\n'
+    + 'RISK: [LOW/MODERATE/HIGH/CRITICAL] - [reason]\n\n'
+    + 'WATCH: [one leading indicator]';
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: fullPrompt })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error || !data.text) {
+      bodyEl.innerHTML = buildClaudeFallback(title, prompt, sev);
+      return;
+    }
+    bodyEl.innerHTML = formatAnalysis(data.text);
+  } catch(e) {
+    bodyEl.innerHTML = buildClaudeFallback(title, prompt, sev);
+  }
+}
+
+function buildClaudeFallback(title, prompt, sev) {
+  const sevCtx = sev ? 'This is a ' + sev.toUpperCase() + ' severity event. ' : '';
+  const full = 'You are a senior geopolitical risk analyst. ' + sevCtx + prompt
+    + ' Give commodity directions (UP/DOWN/NEUTRAL), market impact, risk level (LOW/MODERATE/HIGH/CRITICAL), and one key indicator to watch.';
+  const url = 'https://claude.ai/new?q=' + encodeURIComponent(full);
+  return '<div style="background:var(--blue-bg);border:0.5px solid var(--blue-text);border-radius:10px;padding:14px 16px">'
+    + '<div style="font-size:11px;font-weight:600;color:var(--blue-text);margin-bottom:6px">Add Groq API key for instant in-terminal analysis</div>'
+    + '<div style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.65">'
+    + 'Get a free key at <strong>console.groq.com</strong> (14,400 req/day free) and add it as the '
+    + '<strong>GROQ_API_KEY</strong> environment variable in your Vercel project settings. '
+    + 'Or click below to analyze in Claude.ai now.</div>'
+    + '<a href="' + url + '" target="_blank" rel="noopener" '
+    + 'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--blue);color:#fff;border-radius:8px;font-size:12px;font-weight:500;text-decoration:none">'
+    + 'Analyze in Claude.ai</a>'
+    + '</div>';
+}
+
+// Override the existing showAnalysis to use Groq
+function showAnalysis(title, prompt, sev) {
+  groqAnalyze(title, prompt, sev);
+}
+
+function analyzeCustom() {
+  const val = document.getElementById('custom-input').value.trim();
+  if (!val) return;
+  groqAnalyze(val, 'Analyze the commodity and market impact of: "' + val + '". Give severity score /10, commodity directions, market impact, and risk level.', null);
+}
+
+// ════════════════════════════════════════════════════════════════
+// LIVE NEWS FOR WAR + INDIA TABS via GNews backend
+// ════════════════════════════════════════════════════════════════
+const WAR_FALLBACK = [
+  {cat:'war', headline:'US-Iran ceasefire holds at 3 weeks — back-channel talks via Oman continuing',
+   body:'The ceasefire brokered through Oman entered its third week as of mid-April 2026. Iran has pulled back IRGC naval assets from the Hormuz chokepoint, though 2 frigates remain stationed near Bandar Abbas. Trump has signalled willingness to lift secondary sanctions on Iranian crude buyers if enrichment halts at 60% — Iran has not accepted.',
+   src:'Reuters / Al Jazeera, Apr 2026', impact:'Brent stabilised at $88-92 range. Hormuz fully re-opened Apr 3. Freight rates down 38% from peak.',
+   prompt:'The US-Iran ceasefire is holding at 3 weeks with Oman-mediated talks ongoing. Analyze what complete vs partial resolution means for Brent crude, Hormuz transit, Indian OMCs, and the rupee. What is the probability-weighted commodity outcome?'},
+  {cat:'energy', headline:'Brent at $89 — 4-month low as Hormuz reopens and OPEC+ debates emergency output hike',
+   body:'Brent crude fell to $89/bbl, a 4-month low, after Hormuz fully reopened on April 3rd and Saudi Arabia floated a 500k bbl/day emergency production increase at the April 18 OPEC+ call. Russia opposed any increase, citing compliance issues. UAE and Kuwait backed the Saudi position. The next formal OPEC+ meeting is May 1.',
+   src:'Bloomberg / OilPrice.com, Apr 2026', impact:'India OMCs HPCL, BPCL, IOCL each rallied 12-18% since ceasefire. Rupee recovered from 94.2 to 87.8.',
+   prompt:'Brent at $89 with Hormuz reopened and OPEC+ debating output increase. What is the medium-term crude trajectory? Which Indian sectors re-rate most — OMCs, aviation, paints, tyres? Model the $80 vs $95 Brent scenarios for India equities.'},
+  {cat:'war', headline:'Ukraine-Russia front: Kursk fully recaptured, Sumy under sustained missile pressure',
+   body:'Russia completed recapture of Kursk Oblast by April 10, eliminating Ukraine forward positions. Sumy has faced 14 consecutive nights of Shahed drone attacks. US Patriot battery redeployment to Poland approved. European defence stocks at all-time highs. NATO activating Article 4 consultation but no Article 5 trigger.',
+   src:'Associated Press / BBC, Apr 2026', impact:'European natgas TTF back above €38/MWh on new transit uncertainty. Gold at $3,280 on safe-haven bid.',
+   prompt:'Russia recaptured Kursk and is striking Sumy. NATO activated Article 4. Analyze the commodity and financial market impact — specifically European nat gas, gold, wheat corridor risk, and defence sector. What does this mean for Indian steel exports?'},
+  {cat:'geo', headline:'South China Sea: China seizes Second Thomas Shoal supply mission — Philippines retaliates',
+   body:'Chinese coast guard physically blocked and seized a Philippine supply mission to Second Thomas Shoal on April 14. Philippine Navy responded by attempting to establish a permanent presence. US 7th Fleet activated freedom of navigation operations within 12nm. The confrontation is the closest the two sides have come to direct naval engagement since 2023.',
+   src:'Reuters / SCMP, Apr 15 2026', impact:'TSMC fell 6% on Taiwan risk spillover. S&P tech sector down 2.1% in after-hours.',
+   prompt:'China seized Philippines supply mission at Second Thomas Shoal with US 7th Fleet responding. Analyze the escalation ladder risk, impact on Taiwan Strait tensions, semiconductor supply chain exposure, and what Indian defence and electronics sectors should watch.'},
+  {cat:'sanction', headline:'US imposes 145% tariff on all Chinese goods — China retaliates with 125% on US',
+   body:'The US-China tariff war escalated to levels not seen since the 1930s. The US imposed a blanket 145% tariff on all Chinese imports effective April 9. China retaliated with 125% on all US goods plus rare earth export restrictions. WTO dispute mechanism invoked but non-binding. IMF revised 2026 global growth down to 2.3% from 3.1%.',
+   src:'WSJ / Financial Times, Apr 2026', impact:'Indian textile and electronics exporters gained significant order redirection. But Chinese dumping risk in steel and chemicals intensified.',
+   prompt:'US 145% tariff on China, China 125% retaliation. Model the impact on India — trade diversion opportunity vs Chinese dumping threat. Which Indian sectors win (textiles, PLI electronics) and which sectors face dumping pressure (steel, chemicals, solar)? Give sector-by-sector framework.'},
+  {cat:'war', headline:'Israel-Hezbollah front: ceasefire fraying — 4 IDF soldiers killed in Bekaa',
+   body:'The November 2024 ceasefire is effectively dead. Four IDF soldiers were killed in an ambush in the Bekaa Valley on April 12. Israel responded with strikes on Hezbollah command infrastructure in Baalbek. Lebanon government has collapsed — caretaker PM unable to control Hezbollah. UN UNIFIL forces pulling back from forward positions.',
+   src:'Haaretz / Al Jazeera, Apr 2026', impact:'Gold gained $45 on the news. Lebanon CDS spread at record. Regional shipping via eastern Med at risk.',
+   prompt:'Israel-Hezbollah ceasefire is collapsing with IDF soldiers killed in Lebanon. Analyze the re-escalation risk, impact on regional oil infrastructure, gold as safe-haven trade, and what this means for Indian defence exports and energy security given the eastern Mediterranean angle.'},
+  {cat:'supply', headline:'Red Sea: Houthi attacks resume despite ceasefire — 2 container vessels struck',
+   body:'Houthi forces struck two container vessels in the Red Sea on April 16, claiming exemption from the Iran-US ceasefire since Yemen was never party to talks. Both ships were under Dutch and Greek flag. Container spot rates (Shanghai-Rotterdam) jumped 22% in 48 hours. Maersk and MSC suspended Red Sea routes again.',
+   src:'Lloyd List / Reuters, Apr 17 2026', impact:'Container spot rate Shanghai-Rotterdam: $4,200/FEU, up from $3,440. India EXIM costs rising again.',
+   prompt:'Houthi attacks resumed post-ceasefire, striking 2 ships. Maersk and MSC suspended Red Sea routes again. Analyze the freight market impact, Indian export cost transmission, and which Indian companies are most exposed — Tata Steel exports, pharma bulk drug exports, textile shipments.'},
+  {cat:'market', headline:'Gold at $3,280/oz — central bank buying at record pace, de-dollarisation accelerating',
+   body:'Gold crossed $3,280/oz mid-April, driven by record central bank purchases from China, India, Turkey, and Poland. BRICS nations bought 487 tonnes in Q1 2026 alone versus 310 tonnes all of 2024. The China gold-yuan settlement system now covers 23% of Chinese commodity purchases, up from 6% in 2023.',
+   src:'World Gold Council / Bloomberg, Apr 2026', impact:'Gold MCX crossed Rs 1,04,000/10g. Gold ETFs in India saw record Rs 4,200 crore inflow in March.',
+   prompt:'Gold at $3,280, central banks buying at record pace, de-dollarisation at 23% of Chinese commodity trade. Analyze the long-term gold thesis versus short-term pullback risk. What is the India-specific gold trade — MCX levels, gold ETF allocation, and RBI FX reserve implications?'},
+  {cat:'geo', headline:'Pakistan-India border: LoC ceasefire holds but diplomatic freeze intensifying',
+   body:'The 2021 LoC ceasefire continues to hold militarily, but diplomatic relations are at a 20-year low following India suspending the Indus Waters Treaty and Pakistan suspending airspace access for Indian aircraft. Pakistan Army chief met Saudi Crown Prince and UAE president — India watching the Gulf pivot closely. IMF loan tranche to Pakistan approved over India objection.',
+   src:'The Hindu / Dawn, Apr 2026', impact:'Defence stocks Bharat Electronics, Mazagon Dock, BDL at 52-week highs. India defence budget on track for 3% of GDP.',
+   prompt:'India-Pakistan diplomatic freeze deepening with Indus Waters Treaty suspension and Pakistani pivot to Gulf. Analyze the defence sector impact for Indian listed companies. What is the risk-reward for BEL, Mazagon Dock, HAL, and Data Patterns given the elevated threat perception? Any escalation scenarios to model?'},
+  {cat:'sanction', headline:'Russia SWIFT bypass: SPFS network now covers 58 countries — dollar share of global trade at 46%',
+   body:'The Russian SPFS (SWIFT equivalent) now connects financial institutions in 58 countries including India, China, Iran, Turkey, Brazil, and 12 African nations. The US dollar share of global trade invoicing fell to 46% in March 2026, the lowest since Bretton Woods. India processes 19% of bilateral Russia trade in rupees.',
+   src:'Bank of Russia / BIS Quarterly, Apr 2026', impact:'Rupee gaining international settlement currency status. RBI forex reserves at $673B — 11.8 months import cover.',
+   prompt:'Dollar share of global trade falling to 46% with SPFS covering 58 countries and India settling 19% of Russia trade in rupees. What does de-dollarisation mean for India — rupee internationalisation opportunity, RBI strategy, and which Indian financial sector players benefit? Model the 5-year rupee trajectory.'},
+  {cat:'energy', headline:'India strategic oil reserve full — 5.33 million tonnes stored at Visakhapatnam, Padur, Mangaluru',
+   body:'India completed filling all three Strategic Petroleum Reserve (SPR) facilities by April 8. At $89 Brent, the government locked in approximately $6.2B worth of crude — potentially saving Rs 22,000 crore if prices spike again. Phase 2 expansion at Rajkot and Padur (additional 6.5 MMT) cleared Cabinet committee.',
+   src:'Ministry of Petroleum / PIB, Apr 2026', impact:'India energy security has materially improved. OMC dividend outlook upgraded. HPCL capital allocation improving.',
+   prompt:'India filled its SPR at $89 Brent and is expanding Phase 2. Analyze the strategic and market implications — how does this change India vulnerability to the next oil shock? What does it mean for OMC stock re-rating, and how does Phase 2 expansion affect HPCL and BPCL capex?'},
+  {cat:'market', headline:'IMF World Economic Outlook: global growth 2.3% in 2026 — India holds at 6.4%',
+   body:'IMF April 2026 WEO revised global growth to 2.3%, the weakest since 2009 outside of COVID. US cut to 1.4%, China to 4.1%, EU to 0.8%. India is the only G20 economy upgraded, to 6.4%, driven by domestic consumption, public capex, and services exports. India is now the fastest growing major economy by a significant margin.',
+   src:'IMF World Economic Outlook, Apr 2026', impact:'India 10Y bond yield fell to 6.42%. FII equity inflows of $4.8B in the first two weeks of April.',
+   prompt:'IMF upgraded India to 6.4% growth — only G20 economy upgraded — while cutting US to 1.4% and EU to 0.8%. Analyze the FII flow implications, which Indian sectors benefit most from the growth premium narrative, and how this changes the RBI rate cut probability and timeline.'},
+];
+
+const INDIA_FALLBACK = [
+  {cat:'tech', headline:'OpenAI o3 deployed to 180M users — Infosys and Wipro each issue profit warnings',
+   body:'OpenAI\'s o3 reasoning model, deployed globally in April 2026, can complete in 4 minutes tasks that Infosys and Wipro bill 3 weeks of engineer time for. Both companies issued profit warnings on April 14 citing "accelerated AI transition in client base". Infosys cut FY27 revenue guidance by 4-6%. The SaaSpocalypse that started in February is entering its structural phase.',
+   src:'TechCrunch / NSE Filings, Apr 2026', impact:'Infosys fell 8.4% in 2 sessions. TCS holding better — management cost-optimisation narrative more credible.',
+   prompt:'OpenAI o3 deployment triggered Infosys and Wipro profit warnings. Analyze the structural re-rating risk for Indian IT majors. Which companies within IT are best positioned (TCS vs Infosys vs HCL vs LTIMindtree)? What revenue lines are most at risk? Give a 12-month framework.'},
+  {cat:'india', headline:'RBI April MPC: 25bp cut delivered — repo rate at 6.0%, stance changed to accommodative',
+   body:'RBI cut repo rate by 25bp to 6.0% on April 9 and changed stance from neutral to accommodative, signalling more cuts ahead. Governor Sanjay Malhotra cited CPI at 3.34% in March, Brent stability below $92, and slowing global growth as reasons. Next cut possible in June if CPI stays below 4%. SDF rate now 5.75%.',
+   src:'RBI Monetary Policy Statement, Apr 9 2026', impact:'Housing finance, NBFCs, auto sector rallied 4-8% on the day. 10Y G-sec yield fell to 6.38%.',
+   prompt:'RBI cut 25bp to 6.0% with accommodative stance. Model the transmission into equity markets — which sectors benefit most and on what timeline? Give a sector-by-sector analysis: housing finance (HDFC Ltd, LIC Housing), NBFCs (Bajaj Finance, Shriram), auto (Maruti, M&M), and banks (SBI, ICICI).'},
+  {cat:'india', headline:'India CPI March 2026: 3.34% — food inflation normalising, core at 3.1%',
+   body:'India CPI for March 2026 came in at 3.34% YoY, below the 3.6% consensus. Food inflation fell to 3.1% as vegetable prices normalised post-winter and wheat MSP procurement remained controlled. Core CPI (ex-food, fuel) at 3.1% — the lowest since 2019. This gives RBI clear runway for June cut.',
+   src:'MoSPI / NSE Analytics, Apr 14 2026', impact:'Real rates at 2.66% — the highest in 15 years. Bond market pricing in 3 more cuts in 2026.',
+   prompt:'India CPI at 3.34% with core at 3.1% — real rates at 2.66%, the highest in 15 years. Analyze what this means for debt market returns, equity sector rotation, and RBI policy path. Is the bond market pricing in too many cuts or is the trajectory sustainable?'},
+  {cat:'tech', headline:'Sarvam AI raises $165M Series B — deploys India\'s first 120B parameter sovereign model',
+   body:'Sarvam AI closed a $165M Series B led by Lightspeed and Prosus, with participation from government-backed IndiaAI Mission. The 120B parameter model, trained on 8 trillion tokens of Indic language data across 22 languages, is now live for enterprise clients including IRCTC, SBI, and Apollo Hospitals. Latency benchmarks better than GPT-4o on Indic tasks.',
+   src:'TechCrunch / Sarvam Press Release, Apr 2026', impact:'First credible challenge to OpenAI/Google in India sovereign AI use cases.',
+   prompt:'Sarvam raised $165M and deployed India\'s first 120B sovereign AI model beating GPT-4o on Indic tasks. Analyze: (1) which Indian listed companies are most likely to adopt Sarvam vs OpenAI/Google, (2) the competitive dynamics with Krutrim and BharatGen, (3) investment implications for Indian AI infrastructure plays Neysa and CoreworksAI.'},
+  {cat:'india', headline:'India Q4 FY2026 GDP: 6.7% — full year FY26 at 6.5%, third straight year above 6%',
+   body:'India Q4 FY2026 GDP preliminary estimate came in at 6.7%, ahead of 6.4% consensus. Full-year FY26 GDP at 6.5%. Manufacturing grew 7.3%, services at 7.8%. Construction at 9.1% driven by infrastructure push. Agriculture grew 4.2% — best in 5 years. India is now the 4th largest economy globally having overtaken Japan in December 2025.',
+   src:'MoSPI / CSO Advance Estimate, Apr 2026', impact:'India 4th largest economy globally. FY27 IMF forecast at 6.4% — fastest major economy by wide margin.',
+   prompt:'India FY26 GDP at 6.5%, now 4th largest global economy. Analyze the sectoral breakdown — manufacturing at 7.3%, construction at 9.1%. Which listed companies are capturing the growth? Give a PLI manufacturing beneficiary analysis and infrastructure capex play framework for FY27.'},
+  {cat:'tech', headline:'Anthropic Claude 4 Opus deployed — real-time web access, 2M context, autonomous agents',
+   body:'Anthropic released Claude 4 Opus in April 2026 with native real-time web access, 2 million token context window, and multi-agent orchestration capabilities. The model can independently execute 4-hour research tasks including coding, data analysis, and cross-referencing sources. Enterprise adoption accelerated sharply — Morgan Stanley and Goldman Sachs both deployed Claude 4 in research divisions.',
+   src:'Anthropic / The Verge, Apr 2026', impact:'Indian AI services companies SilverTouch, Mphasis AI division at risk. Indian legal and accounting professions accelerating AI adoption.',
+   prompt:'Claude 4 Opus can autonomously execute 4-hour research and coding tasks. Analyze the India-specific disruption: which white-collar professions face displacement, which Indian companies can build on Claude 4 APIs, and what does autonomous AI mean for IT services pricing models at companies like Mphasis, Persistent, and LTTS?'},
+  {cat:'india', headline:'Nifty 50 at 24,280 — recovering from March lows, FII buying Rs 24,600 crore in April so far',
+   body:'Nifty 50 recovered to 24,280 from the March 21 low of 21,964. FIIs have bought a net Rs 24,600 crore in the first two weeks of April, the strongest FII buying since January 2024. RBI rate cut, crude at $89, rupee recovery to 87.8, and India GDP upgrade driving the rally. DIIs continued buying throughout the correction.',
+   src:'NSE / SEBI / NSDL, Apr 17 2026', impact:'India VIX back to 15.2 from 27.17 March peak. Sensex at 80,110. Small/mid-cap recovery lagging.',
+   prompt:'Nifty at 24,280 with Rs 24,600 crore FII buying in April. Analyze the rally — is this sustainable? What are the key risks (crude re-escalation, US recession, China slowdown)? Give a framework for sector allocation across large-cap, mid-cap, and small-cap in this environment.'},
+  {cat:'india', headline:'India-US trade deal framework agreed — tariff reciprocity pathway, BPO and pharma key asks',
+   body:'India and US agreed to a trade deal framework on April 12, covering tariff reciprocity, digital trade, and market access. India agreed to reduce tariffs on US agricultural products and auto parts. US agreed to exclude India from reciprocal tariff list and extend H-1B cap for Indian tech workers. Pharma and BPO services exempted from tariffs. Deal expected to be finalised by August 2026.',
+   src:'Ministry of Commerce / Reuters, Apr 12 2026', impact:'IT sector rallied 3.2% on H-1B extension news. Pharma sector gained 2.8% on API and formulation exemption.',
+   prompt:'India-US trade deal framework: India gets H-1B cap extension, pharma exemption, no reciprocal tariffs. Analyze the winners across Indian IT (TCS, Infosys), pharma (Sun, Dr Reddy, Cipla), and agricultural losers. What does this mean for the rupee and India-US investment flows?'},
+];
+
+const PORT_SIGNALS = [
+  {badge:'port-buy', label:'Strong Buy', name:'OMCs — HPCL, BPCL, IOCL',
+   text:'Brent at $89 and Hormuz re-opened. Under-recovery gone. HPCL dividend yield now 6.8%. RBI rate cut tailwind for OMC working capital. This is a clean 2-3 quarter earnings upgrade cycle.'},
+  {badge:'port-buy', label:'Add on Dips', name:'PSU Banks — SBI, Canara Bank',
+   text:'RBI cut to 6.0% with accommodative stance. SBI NIM expansion trajectory confirmed. Canara trading at 0.7x book — screaming value. Add into any broad market pullback.'},
+  {badge:'port-hold', label:'Hold Tight', name:'Waaree Energies + Sterling & Wilson',
+   text:'Energy transition trade is 5-year, not 5-month. Crude falling is not a headwind for solar — it is a competitor getting weaker. US tariff situation reduces China solar competition in India. Hold all positions.'},
+  {badge:'port-avoid', label:'Hard Avoid', name:'Infosys, Wipro',
+   text:'Both issued profit warnings post-OpenAI o3 deployment. The revenue model is structurally impaired for FY27. No near-term catalyst. Avoid until management gives a credible AI transition roadmap — none yet.'},
+  {badge:'port-watch', label:'Watch Closely', name:'Avenue Supermarts (DMart)',
+   text:'Rural consumption revival at 6.7% GDP Q4. Quick commerce threat (Blinkit, Zepto) to be tested in Q1 results. If same-store-sales hold above 8%, this is a buy. Below 6% — structural worry confirmed.'},
+  {badge:'port-spec', label:'Speculative Long', name:'Sarvam AI (pre-IPO) + IndiaAI infra',
+   text:'$165M Series B at a valuation that may look cheap at IPO if enterprise adoption scales. Watch IRCTC and SBI deployments as lead indicators. Krutrim also worth monitoring for competitive dynamics.'},
+];
+
+// ════════════════════════════════════════════════════════════════
+// ECONOMIC CALENDAR (IST)
+// ════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════
+// ECONOMIC CALENDAR — dynamic date anchoring from today
+// Events stored as {isoDate, time (IST), country, event, impact, forecast, prev, actual}
+// actual:'—' = pending, actual:value = released
+// isoDate is the calendar date the event falls on (YYYY-MM-DD)
+// ════════════════════════════════════════════════════════════════
+const today = new Date();
+const yy = today.getFullYear();
+
+function iso(y, m, d) { return y + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0'); }
+
+const CALENDAR_EVENTS = [
+  // ── APRIL 2026 — events with known actuals ──
+  {isoDate:iso(2026,4,9),  time:'10:00 AM', country:'IN', event:'RBI MPC Rate Decision',          impact:'high', forecast:'6.00%', prev:'6.25%', actual:'6.00%'},
+  {isoDate:iso(2026,4,9),  time:'12:00 PM', country:'IN', event:'RBI Governor Press Conference',  impact:'high', forecast:'—',     prev:'—',     actual:'Done — accommodative'},
+  {isoDate:iso(2026,4,9),  time:'06:00 PM', country:'US', event:'FOMC Minutes Release',           impact:'high', forecast:'—',     prev:'—',     actual:'Cautious — no cuts imminent'},
+  {isoDate:iso(2026,4,10), time:'06:00 PM', country:'US', event:'Core CPI MoM (Mar)',             impact:'high', forecast:'0.3%',  prev:'0.4%',  actual:'0.4%'},
+  {isoDate:iso(2026,4,10), time:'06:00 PM', country:'US', event:'CPI YoY (Mar)',                  impact:'high', forecast:'2.6%',  prev:'2.8%',  actual:'2.4%'},
+  {isoDate:iso(2026,4,11), time:'06:00 PM', country:'US', event:'PPI MoM (Mar)',                  impact:'high', forecast:'0.2%',  prev:'0.4%',  actual:'0.0%'},
+  {isoDate:iso(2026,4,14), time:'11:30 AM', country:'IN', event:'India CPI YoY (Mar)',            impact:'high', forecast:'3.4%',  prev:'3.21%', actual:'3.34%'},
+  {isoDate:iso(2026,4,14), time:'11:30 AM', country:'IN', event:'India Industrial Production',    impact:'med',  forecast:'4.8%',  prev:'5.0%',  actual:'5.2%'},
+  {isoDate:iso(2026,4,16), time:'06:00 PM', country:'US', event:'Retail Sales MoM (Mar)',        impact:'high', forecast:'-0.1%', prev:'-0.2%', actual:'0.0%'},
+  {isoDate:iso(2026,4,17), time:'06:00 PM', country:'US', event:'Initial Jobless Claims',        impact:'high', forecast:'225K',  prev:'219K',  actual:'215K'},
+  {isoDate:iso(2026,4,17), time:'07:30 PM', country:'US', event:'Philadelphia Fed Index',        impact:'med',  forecast:'-10.2', prev:'-12.5', actual:'—'},
+  {isoDate:iso(2026,4,18), time:'05:30 PM', country:'EU', event:'ECB Rate Decision',             impact:'high', forecast:'2.25%', prev:'2.50%', actual:'—'},
+  {isoDate:iso(2026,4,18), time:'06:00 PM', country:'US', event:'Crude Oil Inventories EIA',     impact:'med',  forecast:'-0.8M', prev:'+2.1M', actual:'—'},
+  // ── UPCOMING APRIL/MAY ──
+  {isoDate:iso(2026,4,23), time:'03:00 PM', country:'EU', event:'Eurozone PMI Composite (Apr)',  impact:'high', forecast:'49.5',  prev:'50.9',  actual:'—'},
+  {isoDate:iso(2026,4,23), time:'07:30 PM', country:'US', event:'S&P US PMI Composite (Apr)',    impact:'high', forecast:'52.1',  prev:'53.5',  actual:'—'},
+  {isoDate:iso(2026,4,25), time:'06:00 PM', country:'US', event:'Non-Farm Payrolls (Mar)',       impact:'high', forecast:'175K',  prev:'228K',  actual:'—'},
+  {isoDate:iso(2026,4,25), time:'06:00 PM', country:'US', event:'Unemployment Rate (Mar)',       impact:'high', forecast:'4.2%',  prev:'4.1%',  actual:'—'},
+  {isoDate:iso(2026,4,28), time:'11:30 AM', country:'IN', event:'India GDP Q4 FY2026 Advance',  impact:'high', forecast:'6.5%',  prev:'6.8%',  actual:'—'},
+  {isoDate:iso(2026,4,29), time:'06:00 PM', country:'US', event:'Core PCE Price Index MoM',      impact:'high', forecast:'0.3%',  prev:'0.4%',  actual:'—'},
+  {isoDate:iso(2026,4,29), time:'06:00 PM', country:'US', event:'GDP Growth Rate QoQ Prel',      impact:'high', forecast:'-0.4%', prev:'2.4%',  actual:'—'},
+  {isoDate:iso(2026,4,30), time:'05:30 PM', country:'EU', event:'Eurozone CPI Flash (Apr)',      impact:'high', forecast:'2.1%',  prev:'2.2%',  actual:'—'},
+  {isoDate:iso(2026,5,1),  time:'07:30 PM', country:'US', event:'OPEC+ Monthly Meeting',         impact:'high', forecast:'—',     prev:'—',     actual:'—'},
+  {isoDate:iso(2026,5,1),  time:'11:30 PM', country:'US', event:'FOMC Rate Decision',            impact:'high', forecast:'4.25-4.50%', prev:'4.25-4.50%', actual:'—'},
+  {isoDate:iso(2026,5,1),  time:'11:30 PM', country:'US', event:'Fed Chair Powell Press Conf.',  impact:'high', forecast:'—',     prev:'—',     actual:'—'},
+  {isoDate:iso(2026,5,7),  time:'06:00 PM', country:'US', event:'Initial Jobless Claims',        impact:'high', forecast:'218K',  prev:'215K',  actual:'—'},
+  {isoDate:iso(2026,5,9),  time:'06:00 PM', country:'US', event:'Michigan Consumer Sentiment',   impact:'med',  forecast:'55.0',  prev:'52.2',  actual:'—'},
+  {isoDate:iso(2026,5,12), time:'11:30 AM', country:'IN', event:'India CPI YoY (Apr)',           impact:'high', forecast:'3.5%',  prev:'3.34%', actual:'—'},
+  {isoDate:iso(2026,5,12), time:'11:30 AM', country:'IN', event:'India WPI YoY (Apr)',           impact:'med',  forecast:'2.1%',  prev:'2.38%', actual:'—'},
+  {isoDate:iso(2026,5,13), time:'06:00 PM', country:'US', event:'Core CPI MoM (Apr)',            impact:'high', forecast:'0.3%',  prev:'0.4%',  actual:'—'},
+  {isoDate:iso(2026,5,15), time:'06:00 PM', country:'US', event:'Retail Sales MoM (Apr)',        impact:'high', forecast:'0.2%',  prev:'0.0%',  actual:'—'},
+  {isoDate:iso(2026,5,20), time:'05:30 PM', country:'EU', event:'ECB Meeting Minutes',           impact:'med',  forecast:'—',     prev:'—',     actual:'—'},
+  {isoDate:iso(2026,5,22), time:'11:30 AM', country:'IN', event:'India FX Reserves (weekly)',    impact:'med',  forecast:'$675B', prev:'$673B', actual:'—'},
+  {isoDate:iso(2026,5,28), time:'11:30 PM', country:'US', event:'FOMC Meeting Begins',           impact:'high', forecast:'—',     prev:'—',     actual:'—'},
+  {isoDate:iso(2026,6,4),  time:'06:00 PM', country:'US', event:'Non-Farm Payrolls (May)',       impact:'high', forecast:'180K',  prev:'175K',  actual:'—'},
+  {isoDate:iso(2026,6,11), time:'10:00 AM', country:'IN', event:'RBI MPC Rate Decision (Jun)',   impact:'high', forecast:'5.75%', prev:'6.00%', actual:'—'},
+];
+
+// ════════════════════════════════════════════════════════════════
+// LIVE NEWS LOADERS FOR WAR + INDIA TABS
+// ════════════════════════════════════════════════════════════════
+async function loadTabNews(query, fallback, containerId, statusMsg) {
+  // Always use curated fallback for tab-specific content.
+  // The generic backend feed is not filtered by topic and shows the same
+  // general geo news as the main GeoIntel tab — defeating the purpose of these tabs.
+  renderBriefCards(fallback, containerId);
+}
+
+// ════════════════════════════════════════════════════════════════
+// RENDER FUNCTIONS
+// ════════════════════════════════════════════════════════════════
+const CAT_LABELS = {war:'War', market:'Markets', india:'India', tech:'Tech/AI', energy:'Energy', portfolio:'Portfolio', geo:'Geo', supply:'Supply', sanction:'Sanction', trade:'Trade'};
+
+function renderBriefCards(stories, containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = stories.map(s => {
+    const cat = s.cat || 'geo';
+    const label = CAT_LABELS[cat] || cat;
+    const claudeUrl = 'https://claude.ai/new?q=' + encodeURIComponent(
+      'You are a senior geopolitical and market analyst. ' + (s.prompt || s.headline)
+      + ' Give: market direction, affected Indian sectors, risk level, one actionable insight.'
+    );
+    return '<div class="brief-card">'
+      + '<div class="brief-card-head"><span class="bcat bcat-' + cat + '">' + label + '</span>'
+      + '<span class="brief-hl">' + s.headline + '</span></div>'
+      + '<div class="brief-body">' + (s.body || '') + (s.impact ? '<br><br><strong style="color:var(--text)">Market impact:</strong> ' + s.impact : '') + '</div>'
+      + '<div class="brief-footer"><span class="brief-src">' + (s.src || '') + '</span>'
+      + '<div style="display:flex;gap:6px">'
+      + '<button onclick="groqAnalyze(' + "'" + s.headline.replace(/'/g, '') + "'" + ',' + "'" + (s.prompt || s.headline).replace(/'/g, '').replace(/"/g, '') + "'" + ',null)" class="brief-btn">Analyze</button>'
+      + '<a href="' + claudeUrl + '" target="_blank" rel="noopener" class="brief-btn" style="background:var(--blue)">Claude.ai</a>'
+      + '</div></div>'
+      + '</div>';
+  }).join('');
+}
+
+function renderPortSignals() {
+  const el = document.getElementById('port-signals');
+  if (!el) return;
+  // badge class map: port-buy→pbuy, port-avoid→pavoid, port-hold→phold, port-watch→pwatch, port-spec→pspec
+  const badgeMap = {'port-buy':'pbuy','port-avoid':'pavoid','port-hold':'phold','port-watch':'pwatch','port-spec':'pspec'};
+  el.innerHTML = PORT_SIGNALS.map(s => {
+    const badgeCls = badgeMap[s.badge] || s.badge;
+    return '<div class="port-row">'
+      + '<span class="port-badge ' + badgeCls + '">' + s.label + '</span>'
+      + '<div class="port-txt"><div class="port-name">' + s.name + '</div>' + s.text + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+let calFilter = 'all';
+function filterCal(btn, f) {
+  calFilter = f;
+  document.querySelectorAll('.cfbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const now = new Date();
+  // Normalise today to midnight for comparison
+  const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const filtered = CALENDAR_EVENTS.filter(e => {
+    if (calFilter === 'all')  return true;
+    if (calFilter === 'high') return e.impact === 'high';
+    return e.country === calFilter;
+  });
+
+  // Group by isoDate
+  const grouped = {};
+  filtered.forEach(e => {
+    if (!grouped[e.isoDate]) grouped[e.isoDate] = [];
+    grouped[e.isoDate].push(e);
+  });
+
+  let html = '';
+  Object.keys(grouped).sort().forEach(dateStr => {
+    const d = new Date(dateStr + 'T00:00:00');
+    const diffDays = Math.round((d - todayMid) / 86400000);
+    const dayLabel = diffDays === 0 ? 'Today — '
+      : diffDays === 1  ? 'Tomorrow — '
+      : diffDays === -1 ? 'Yesterday — '
+      : diffDays < 0    ? diffDays + ' days ago — '
+      : '';
+    const dateLabel = d.toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'short', year:'numeric'});
+    const isPast = diffDays < 0;
+    html += '<div class="cal-day-h"' + (isPast ? ' style="opacity:.6"' : '') + '>' + dayLabel + dateLabel + '</div>';
+
+    grouped[dateStr].forEach(e => {
+      const dot = e.impact === 'high' ? 'chi' : e.impact === 'med' ? 'cme' : 'clo';
+      const hasActual = e.actual !== '—' && e.actual !== '';
+      // Determine if actual beat/missed forecast (simple string comparison where numeric)
+      let actCls = 'cpend';
+      if (hasActual) {
+        const actNum  = parseFloat(e.actual);
+        const foreNum = parseFloat(e.forecast);
+        if (!isNaN(actNum) && !isNaN(foreNum)) {
+          actCls = actNum >= foreNum ? 'cbeat' : 'cmiss';
+        } else {
+          actCls = 'cbeat'; // non-numeric actual means it was released
+        }
+      }
+      const rowStyle = isPast && hasActual ? ' style="opacity:.75"' : isPast ? ' style="opacity:.55"' : '';
+      html += '<div class="cal-row"' + rowStyle + '>'
+        + '<span class="cal-time">' + e.time + '</span>'
+        + '<span class="cal-dot ' + dot + '"></span>'
+        + '<span class="cal-ctry">' + e.country + '</span>'
+        + '<span class="cal-ev">' + e.event + '</span>'
+        + '<span class="cal-num" style="color:var(--text2)">' + e.forecast + '</span>'
+        + '<span class="cal-num" style="color:var(--text3)">' + e.prev + '</span>'
+        + '<span class="cal-num ' + actCls + '">' + e.actual + '</span>'
+        + '</div>';
+    });
+  });
+
+  const el = document.getElementById('calendar-body');
+  if (el) el.innerHTML = html || '<div style="padding:20px;color:var(--text3);font-size:12px">No events match this filter.</div>';
+}
+
+// ════════════════════════════════════════════════════════════════
+// INDIA MACRO — live fetch from backend
+// ════════════════════════════════════════════════════════════════
+
+function macroCard(lbl, val, sub, color, smallVal) {
+  const valStyle = smallVal ? 'font-size:15px' : '';
+  return '<div class="macro-card">'
+    + '<div class="macro-lbl">' + lbl + '</div>'
+    + '<div class="macro-val ' + (color||'') + '"' + (valStyle ? ' style="' + valStyle + '"' : '') + '>' + val + '</div>'
+    + '<div class="macro-sub">' + sub + '</div>'
+    + '</div>';
+}
+
+function renderMacro(data) {
+  const m = data.market      || {};
+  const f = data.fundamentals || {};
+
+  // ── Markets grid ──
+  const marketsEl = document.getElementById('macro-markets');
+  if (marketsEl) {
+    const MARKET_LABELS = { sensex:'Sensex', nifty50:'Nifty 50', niftyBank:'Nifty Bank', usdInr:'USD/INR', indiaVix:'India VIX', goldbees:'Gold ETF' };
+    const cards = Object.entries(MARKET_LABELS).map(([id, lbl]) => {
+      if (m[id]) {
+        return macroCard(lbl, m[id].value, m[id].sub, m[id].color, m[id].value && m[id].value.length > 7);
+      }
+      // Fallback placeholder if ticker not returned
+      return macroCard(lbl, '—', 'No data', 'mwarn', false);
+    });
+    // Append FII flows from fundamentals
+    if (f.fiiFlows) cards.push(macroCard(f.fiiFlows.label, f.fiiFlows.value, f.fiiFlows.sub, f.fiiFlows.color, true));
+    marketsEl.innerHTML = cards.join('');
+  }
+
+  // ── Energy grid — mix of fundamentals + live Brent from commodity prices ──
+  const energyEl = document.getElementById('macro-energy');
+  if (energyEl) {
+    const brentLive = livePrices['brent'];
+    const brentVal  = brentLive ? '$' + brentLive.price : (f.hormuz ? '$103' : '—');
+    const brentSub  = brentLive ? (brentLive.up ? '▲ ' : '▼ ') + brentLive.chg + ' today' : 'Reference price';
+    const brentColor = brentLive ? (brentLive.up ? 'mwarn' : 'mup') : 'mwarn';
+
+    energyEl.innerHTML = [
+      f.petrolDelhi  ? macroCard(f.petrolDelhi.label,  f.petrolDelhi.value,  f.petrolDelhi.sub,  f.petrolDelhi.color)  : '',
+      f.dieselDelhi  ? macroCard(f.dieselDelhi.label,  f.dieselDelhi.value,  f.dieselDelhi.sub,  f.dieselDelhi.color)  : '',
+      f.lpg          ? macroCard(f.lpg.label,          f.lpg.value,          f.lpg.sub,          f.lpg.color)          : '',
+      macroCard('Brent Crude', brentVal, brentSub, brentColor),
+      f.crudeImport  ? macroCard(f.crudeImport.label,  f.crudeImport.value,  f.crudeImport.sub,  f.crudeImport.color)  : '',
+      f.hormuz       ? macroCard(f.hormuz.label,       f.hormuz.value,       f.hormuz.sub,       f.hormuz.color)       : '',
+    ].join('');
+  }
+
+  // ── Policy grid ──
+  const policyEl = document.getElementById('macro-policy');
+  if (policyEl) {
+    policyEl.innerHTML = [
+      f.cpi         ? macroCard(f.cpi.label,      f.cpi.value,      f.cpi.sub,      f.cpi.color)      : '',
+      f.repoRate    ? macroCard(f.repoRate.label,  f.repoRate.value, f.repoRate.sub, f.repoRate.color) : '',
+      m.goldbees    ? macroCard('Gold ETF (BeES)', m.goldbees.value, m.goldbees.sub, m.goldbees.color, true) : '',
+      f.diiFlows    ? macroCard(f.diiFlows.label,  f.diiFlows.value, f.diiFlows.sub, f.diiFlows.color, true) : '',
+      f.gdp         ? macroCard(f.gdp.label,       f.gdp.value,      f.gdp.sub,      f.gdp.color)      : '',
+    ].join('');
+  }
+
+  // ── RBI Watch strip ──
+  const rbiEl = document.getElementById('macro-rbi-watch');
+  if (rbiEl && f.rbiWatch && f.rbiWatch.value) {
+    rbiEl.style.display = 'block';
+    rbiEl.innerHTML = '<strong>RBI Watch:</strong> ' + f.rbiWatch.value;
+  }
+
+  // ── Status bar ──
+  const dot    = document.getElementById('macro-dot');
+  const status = document.getElementById('macro-status');
+  const ts     = document.getElementById('macro-last-update');
+  if (dot) dot.className = 's-dot s-green';
+  if (status) status.textContent = 'India macro dashboard · live';
+  if (ts && data.lastFetched) {
+    ts.textContent = '· updated ' + new Date(data.lastFetched).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// INDIA MACRO — tries Railway backend, falls back to verified
+// April 2026 reference data from RBI / MoSPI / NSE
+// ════════════════════════════════════════════════════════════════
+
+// Verified Apr 2026 reference data — updated in code periodically
+const MACRO_REFERENCE = {
+  market: {
+    sensex:    {value:'80,110',  sub:'Apr 17 close',  color:'mup'},
+    nifty50:   {value:'24,280',  sub:'Apr 17 close',  color:'mup'},
+    niftyBank: {value:'52,840',  sub:'Apr 17 close',  color:'mup'},
+    usdInr:    {value:'87.82',   sub:'Recovery from 94.2 peak', color:'mup'},
+    indiaVix:  {value:'15.2',    sub:'Normalised from 27.17', color:'mup'},
+    goldbees:  {value:'Rs 928',  sub:'Gold ETF (BeES) NAV',    color:'mup'},
+  },
+  fundamentals: {
+    cpi:       {label:'CPI YoY (Mar)', value:'3.34%',  sub:'Below 4% RBI target',  color:'mup'},
+    repoRate:  {label:'Repo Rate',     value:'6.00%',  sub:'Cut 25bp — Apr 9 MPC', color:'mup'},
+    gdp:       {label:'GDP Q4 FY26',   value:'6.7%',   sub:'FY26 full year 6.5%',  color:'mup'},
+    diiFlows:  {label:'DII Flows (Apr)', value:'+Rs 31,200 cr', sub:'Apr 1-17 cumulative', color:'mup'},
+    fiiFlows:  {label:'FII Flows (Apr)', value:'+Rs 24,600 cr', sub:'Apr 1-17 buying',     color:'mup'},
+    petrolDelhi:{label:'Petrol Delhi', value:'Rs 94.72', sub:'Stable — no revision', color:'mwarn'},
+    dieselDelhi:{label:'Diesel Delhi', value:'Rs 87.62', sub:'Stable — no revision', color:'mwarn'},
+    lpg:       {label:'LPG Cylinder',  value:'Rs 803',  sub:'14.2kg Delhi — Mar 26', color:'mwarn'},
+    crudeImport:{label:'Crude Basket', value:'$88.6',   sub:'India reference basket', color:'mup'},
+    hormuz:    {label:'Hormuz Status', value:'Open',    sub:'Fully reopened Apr 3',   color:'mup'},
+    rbiWatch:  {value:'RBI cut repo to 6.00% on Apr 9 with accommodative stance — signalling further easing if CPI holds below 4%. FX reserves at $673B (11.8 months cover). Next MPC: Jun 2026. Market pricing 2 more 25bp cuts in FY27.'},
+  },
+  lastFetched: new Date().toISOString(),
+  source: 'reference'
+};
+
+async function loadMacro() {
+  const dot    = document.getElementById('macro-dot');
+  const status = document.getElementById('macro-status');
+  const ts     = document.getElementById('macro-last-update');
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    const res  = await fetch(BACKEND_URL + '/api/macro', {signal: controller.signal});
+    clearTimeout(timeout);
+    const data = await res.json();
+    if (data && (data.market || data.fundamentals)) {
+      renderMacro(data);
+      if (dot)    dot.className = 's-dot s-green';
+      if (status) status.textContent = 'India macro — live from backend';
+      return;
+    }
+  } catch(e) {
+    // Backend offline — Railway free tier expired
+  }
+
+  // Fallback: render reference data clearly labelled
+  renderMacro(MACRO_REFERENCE);
+  if (dot)    dot.className = 's-dot s-amber';
+  if (status) status.textContent = 'Backend offline — showing verified Apr 2026 reference data';
+  if (ts)     ts.textContent = '· RBI / NSE / MoSPI — Apr 17';
+}
+
+// ════════════════════════════════════════════════════════════════
+// INDIA STOCK WATCHLIST — Railway backend or hardcoded fallback
+// ════════════════════════════════════════════════════════════════
+
+const STOCKS_REFERENCE = [
+  {symbol:'RELIANCE', name:'Reliance Industries', sector:'Conglomerate', price:'2,847', chg:'+1.2%', chgAbs:'+33.8', volume:'8.2M', pe:'24.1', up:true},
+  {symbol:'TCS',      name:'Tata Consultancy',   sector:'IT',           price:'3,512', chg:'-2.4%', chgAbs:'-86.2', volume:'3.1M', pe:'28.6', up:false},
+  {symbol:'HDFCBANK', name:'HDFC Bank',           sector:'Banking',      price:'1,748', chg:'+0.6%', chgAbs:'+10.4', volume:'12.1M',pe:'17.2', up:true},
+  {symbol:'INFY',     name:'Infosys',             sector:'IT',           price:'1,421', chg:'-3.1%', chgAbs:'-45.3', volume:'9.4M', pe:'22.4', up:false},
+  {symbol:'SBI',      name:'State Bank of India', sector:'PSU Bank',     price:'812',   chg:'+2.8%', chgAbs:'+22.1', volume:'18.3M',pe:'10.4', up:true},
+  {symbol:'HPCL',     name:'HPCL',                sector:'OMC',          price:'378',   chg:'+3.6%', chgAbs:'+13.1', volume:'14.7M',pe:'8.2',  up:true},
+  {symbol:'BPCL',     name:'BPCL',                sector:'OMC',          price:'322',   chg:'+2.9%', chgAbs:'+9.1',  volume:'11.2M',pe:'7.6',  up:true},
+  {symbol:'SBIN',     name:'SBI',                 sector:'PSU Bank',     price:'812',   chg:'+2.8%', chgAbs:'+22.1', volume:'18.3M',pe:'10.4', up:true},
+  {symbol:'WAAREE',   name:'Waaree Energies',     sector:'Solar',        price:'2,640', chg:'+1.8%', chgAbs:'+46.6', volume:'2.1M', pe:'52.3', up:true},
+  {symbol:'BEL',      name:'Bharat Electronics',  sector:'Defence',      price:'312',   chg:'+4.2%', chgAbs:'+12.6', volume:'22.4M',pe:'38.6', up:true},
+  {symbol:'DRREDDY',  name:'Dr. Reddy\'s Labs',   sector:'Pharma',       price:'5,820', chg:'+1.4%', chgAbs:'+80.4', volume:'1.8M', pe:'21.8', up:true},
+  {symbol:'MARUTI',   name:'Maruti Suzuki',        sector:'Auto',         price:'12,340',chg:'+2.1%', chgAbs:'+253.9',volume:'0.9M', pe:'26.4', up:true},
+];
+
+function renderWatchlist(stocks) {
+  const tbody = document.getElementById('wl-body');
+  const count = document.getElementById('wl-count');
+  const ts    = document.getElementById('wl-last-update');
+  if (!tbody) return;
+
+  if (!stocks || stocks.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:16px;color:var(--text3);font-size:12px;text-align:center">No data available</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = stocks.map(s => {
+    const cls = s.up ? 'wl-up' : 'wl-dn';
+    const arr = s.up ? '▲' : '▼';
+    return '<tr>'
+      + '<td><div class="wl-sym">' + s.symbol + '</div><div class="wl-name">' + s.name + '</div></td>'
+      + '<td><span class="wl-sector">' + s.sector + '</span></td>'
+      + '<td class="wl-price">' + s.price + '</td>'
+      + '<td class="wl-chg ' + cls + '">' + arr + ' ' + s.chg + '</td>'
+      + '<td class="wl-chg ' + cls + '">' + s.chgAbs + '</td>'
+      + '<td class="wl-num">' + s.volume + '</td>'
+      + '<td class="wl-num">' + s.pe + '</td>'
+      + '</tr>';
+  }).join('');
+
+  if (count) count.textContent = stocks.length + ' stocks';
+  if (ts)    ts.textContent = '· updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function loadStocks() {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    const res  = await fetch(BACKEND_URL + '/api/stocks', {signal: controller.signal});
+    clearTimeout(timeout);
+    const data = await res.json();
+    if (data.stocks && data.stocks.length > 0) {
+      renderWatchlist(data.stocks);
+      const count = document.getElementById('wl-count');
+      if (count) count.textContent = data.stocks.length + ' stocks · NSE live';
+      return;
+    }
+  } catch(e) {
+    // Backend offline
+  }
+  // Use reference data and label it clearly
+  renderWatchlist(STOCKS_REFERENCE);
+  const count = document.getElementById('wl-count');
+  const ts    = document.getElementById('wl-last-update');
+  if (count) count.textContent = STOCKS_REFERENCE.length + ' stocks · Reference Apr 17';
+  if (ts)    ts.textContent = '· Backend offline — reference prices';
+}
+
+// ── INIT NEW TABS ──────────────────────────────────────────────
+loadTabNews('iran war hormuz oil', WAR_FALLBACK, 'war-cards', 'War Intel');
+loadTabNews('india AI tech rupee', INDIA_FALLBACK, 'india-cards', 'India + Tech');
+loadMacro();
+loadStocks();
+setInterval(loadMacro,  5 * 60 * 1000);
+setInterval(loadStocks, 5 * 60 * 1000);
+renderPortSignals();
+renderCalendar();
+
+</script>
+</body>
+</html>

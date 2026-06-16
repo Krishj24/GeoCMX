@@ -1,0 +1,16 @@
+{
+  "name": "geointel-terminal",
+  "version": "2.0.0",
+  "description": "GeoIntel Terminal — geopolitical risk and commodity market intelligence",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "devDependencies": {
+    "vercel": "^34.0.0"
+  }
+}
