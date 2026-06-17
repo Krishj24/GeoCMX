@@ -710,6 +710,7 @@ const COMMODITIES = [
 let activeCom = 'brent';
 let activeCat = 'All';
 let currentNews = [];
+let currentNewsIsLive = false;
 let expandedLb = null;
 
 // ── TAB SWITCH ─────────────────────────────────────────────────────
@@ -782,15 +783,22 @@ async function loadNews() {
   try {
     const res = await fetch(BACKEND_URL+'/api/news');
     const data = await res.json();
-    if (data.news && data.news.length > 0) {
-      currentNews = data.news;
+    if (!data.news || data.news.length === 0) throw new Error('empty');
+    currentNews = data.news;
+    currentNewsIsLive = data.source === 'live';
+    const t = new Date(data.lastFetched).toLocaleTimeString();
+    if (currentNewsIsLive) {
       document.getElementById('news-dot').className = 's-dot s-green';
-      const t = new Date(data.lastFetched).toLocaleTimeString();
       document.getElementById('news-status').textContent = data.news.length+' live events · '+t;
       document.getElementById('live-label').textContent = 'Live';
-    } else throw new Error('empty');
+    } else {
+      document.getElementById('news-dot').className = 's-dot s-amber';
+      document.getElementById('news-status').textContent = 'GNews quota/feed unavailable — showing reference events · '+t;
+      document.getElementById('live-label').textContent = 'Demo';
+    }
   } catch {
     currentNews = FALLBACK_NEWS;
+    currentNewsIsLive = false;
     document.getElementById('news-dot').className = 's-dot s-amber';
     document.getElementById('news-status').textContent = 'Backend not connected — showing reference events';
     document.getElementById('live-label').textContent = 'Demo';
@@ -811,7 +819,7 @@ function renderNews() {
     '<div class="impact-pills">'+n.affected.map(a=>'<span class="impact-pill pill-'+a.d+'">'+(a.d==='up'?'▲':'▼')+' '+a.c+'</span>').join('')+'</div></div>' +
     '<div class="news-actions">' +
     '<button class="btn-analyze" onclick="event.stopPropagation();selectNews('+i+')">Analyze vs market ↗</button>' +
-    '<a class="btn-source" href="'+(n.url||'#')+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Read source ↗</a>' +
+    '<a class="btn-source" href="'+(n.url||'#')+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">'+(currentNewsIsLive?'Read source ↗':'Visit source (demo) ↗')+'</a>' +
     '</div></div>'
   ).join('');
 }
