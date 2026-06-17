@@ -126,19 +126,21 @@ function marketCard(label, data, bigNum = false) {
 }
 
 // Hardcoded fundamentals — sourced from RBI/MoSPI/PIB
-// Update this object whenever key data is released
+// No free live JSON feed exists for these (PPAC/MoSPI only publish PDFs/HTML),
+// so they are refreshed manually from verified reporting. Last refreshed
+// 2026-06-17 against MoSPI, RBI MPC (Jun 5 2026) and pump-price reporting.
 const FUNDAMENTALS = {
-  cpi:        { label: 'CPI YoY (Mar 2026)',  value: '3.34%',  sub: 'MoSPI — Apr 14 2026',     color: 'mup'  },
-  repoRate:   { label: 'Repo Rate',            value: '6.00%',  sub: 'RBI cut 25bp — Apr 9',     color: 'mup'  },
-  gdp:        { label: 'GDP Q4 FY2026',        value: '6.7%',   sub: 'FY26 full year 6.5%',      color: 'mup'  },
-  petrolDelhi:{ label: 'Petrol Delhi',         value: 'Rs 94.72', sub: 'No revision since Oct 24', color: 'mwarn'},
-  dieselDelhi:{ label: 'Diesel Delhi',         value: 'Rs 87.62', sub: 'No revision since Oct 24', color: 'mwarn'},
-  lpg:        { label: 'LPG Cylinder',         value: 'Rs 803',   sub: '14.2kg Delhi — Mar 2026',  color: 'mwarn'},
-  crudeImport:{ label: 'India Crude Basket',   value: '$88.6',    sub: 'PPAC reference — Apr 17',  color: 'mup'  },
-  hormuz:     { label: 'Hormuz Status',        value: 'Open',     sub: 'Reopened Apr 3 2026',      color: 'mup'  },
-  fiiFlows:   { label: 'FII Flows Apr',        value: '+Rs 24,600 cr', sub: 'Apr 1-17 net buying', color: 'mup'  },
-  diiFlows:   { label: 'DII Flows Apr',        value: '+Rs 31,200 cr', sub: 'Apr 1-17 cumulative',  color: 'mup'  },
-  rbiWatch:   { value: 'RBI cut repo to 6.00% (Apr 9) with ACCOMMODATIVE stance — signalling further easing. FX reserves $673B (11.8 months import cover). CPI trajectory: 3.34% Mar → ~3.5% Apr (seasonal). Next MPC: June 2026. Market pricing 2 more 25bp cuts in FY27.' },
+  cpi:        { label: 'CPI YoY (May 2026)',  value: '3.93%',  sub: 'MoSPI — released Jun 12 2026', color: 'mup'  },
+  repoRate:   { label: 'Repo Rate',            value: '5.25%',  sub: 'RBI MPC Jun 5 — held, Neutral stance', color: 'mup'  },
+  gdp:        { label: 'GDP Q4 FY2026',        value: '7.8%',   sub: 'FY26 full year 7.7%',      color: 'mup'  },
+  petrolDelhi:{ label: 'Petrol Delhi',         value: 'Rs 102.12', sub: 'As of Jun 16 2026', color: 'mwarn'},
+  dieselDelhi:{ label: 'Diesel Delhi',         value: 'Rs 95.20',  sub: 'As of Jun 16 2026', color: 'mwarn'},
+  lpg:        { label: 'LPG Cylinder',         value: 'Rs 942',   sub: '14.2kg Delhi — Jun 16 2026 (+Rs29 m/m)', color: 'mwarn'},
+  crudeImport:{ label: 'India Crude Basket',   value: '$88.6',    sub: 'PPAC reference (overwritten by live Brent below if available)', color: 'mup'  },
+  hormuz:     { label: 'Hormuz Status',        value: 'Effectively closed', sub: 'Conditional ceasefire; ~95% crude / ~99% LNG volume drop vs normal', color: 'mdn' },
+  fiiFlows:   { label: 'FII Flows (H1 CY26)',  value: '-Rs 2.8 lakh cr', sub: 'Net selling, Jan-Jun 9 2026 — NSDL', color: 'mdn'  },
+  diiFlows:   { label: 'DII Flows (H1 CY26)',  value: '+Rs 4.3 lakh cr', sub: 'Record net buying, Jan-Jun 9 2026', color: 'mup'  },
+  rbiWatch:   { value: 'RBI MPC (Jun 5 2026) held repo at 5.25% with a NEUTRAL stance, citing CPI below target but with an upward bias. May CPI printed 3.93% YoY (food 4.78%), up from April. Q4 FY26 GDP surprised at 7.8%, full-year FY26 growth 7.7%. DIIs have been absorbing a historic wave of FPI selling — DII net buying of Rs 4.3 lakh cr in H1 CY26 against FPI net selling of Rs 2.8 lakh cr over the same period.' },
 };
 
 export default async function handler(req, res) {
