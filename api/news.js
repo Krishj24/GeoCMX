@@ -4,7 +4,11 @@
 // Falls back to curated reference events if GNews quota hit.
 
 const GNEWS_KEY = process.env.GNEWS_API_KEY || '';
-const CACHE_TTL = 20 * 60 * 1000; // 20 min
+// GNews free tier = 100 requests/day total. Each query below costs 1 request.
+// Cache TTL raised from 20→60 min and topics merged into a single query each
+// (was 3+2+2=7 calls per full refresh cycle, now 1+1+1=3) to stay well under
+// quota even when Vercel cold-starts wipe the in-memory cache between visits.
+const CACHE_TTL = 60 * 60 * 1000; // 60 min
 
 // Separate cache per topic so War Intel / India+Tech tabs don't collide
 // with the general feed's cache entry.
@@ -83,19 +87,17 @@ function buildPrompt(title, sev, affected) {
 // must appear in the article, which is why the old literal multi-word
 // queries ("geopolitical war sanctions oil") returned almost nothing.
 // Use explicit OR between keywords for broad recall instead.
+// One merged query per topic (not 2-3) — each query is a separate GNews
+// request and the free plan only allows 100/day total.
 const TOPIC_QUERIES = {
   general: [
-    'war OR conflict OR sanctions OR tariff OR ceasefire OR military OR missile',
-    'oil OR opec OR crude OR brent OR hormuz OR shipping OR tanker',
-    'india OR rbi OR rupee OR sensex OR nifty OR trade OR economy',
+    'war OR conflict OR sanctions OR tariff OR ceasefire OR military OR missile OR oil OR opec OR crude OR brent OR hormuz OR shipping OR tanker OR india OR rbi OR rupee OR sensex OR nifty OR economy',
   ],
   war: [
-    'war OR military OR missile OR strike OR ceasefire OR invasion OR troops',
-    'hormuz OR houthi OR iran OR israel OR ukraine OR russia OR gaza',
+    'war OR military OR missile OR strike OR ceasefire OR invasion OR troops OR hormuz OR houthi OR iran OR israel OR ukraine OR russia OR gaza',
   ],
   india: [
-    'india OR rupee OR rbi OR sensex OR nifty OR infosys OR tcs',
-    'india AI OR startup OR tech OR semiconductor OR ipo',
+    'india OR rupee OR rbi OR sensex OR nifty OR infosys OR tcs OR startup OR semiconductor OR ipo',
   ],
 };
 
