@@ -713,12 +713,27 @@ let currentNews = [];
 let currentNewsIsLive = false;
 let expandedLb = null;
 
+// Lazy-load War Intel / India+Tech news only the first time each tab is
+// opened, instead of firing both on every page load. GNews's free plan is
+// capped at 100 requests/day total — fetching tabs nobody looks at burns
+// through that budget and is what pushes the whole app into "Demo" mode.
+const tabNewsLoaded = { war: false, india: false };
+
 // ── TAB SWITCH ─────────────────────────────────────────────────────
 function switchTab(t) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelector('[onclick="switchTab(\''+t+'\')"]').classList.add('active');
   document.getElementById(t+'-panel').classList.add('active');
+
+  if (t === 'war' && !tabNewsLoaded.war) {
+    tabNewsLoaded.war = true;
+    loadTabNews('war', WAR_FALLBACK, 'war-cards', 'War Intel');
+  }
+  if (t === 'india' && !tabNewsLoaded.india) {
+    tabNewsLoaded.india = true;
+    loadTabNews('india', INDIA_FALLBACK, 'india-cards', 'India + Tech');
+  }
 }
 
 // ── COMMODITY RELEVANCE SCORES PER EVENT ──────────────────────────
@@ -1262,7 +1277,7 @@ renderComGrid();
 selectCom('brent');
 loadNews();
 loadPrices();
-setInterval(loadNews,   30 * 60 * 1000);
+setInterval(loadNews,   60 * 60 * 1000);
 
 // ════════════════════════════════════════════════════════════════
 // AI ANALYSIS — proxied server-side via /api/analyze (Groq LLaMA 3.3)
@@ -1855,10 +1870,18 @@ async function loadStocks() {
 }
 
 // ── INIT NEW TABS ──────────────────────────────────────────────
-loadTabNews('war', WAR_FALLBACK, 'war-cards', 'War Intel');
-loadTabNews('india', INDIA_FALLBACK, 'india-cards', 'India + Tech');
-setInterval(() => loadTabNews('war', WAR_FALLBACK, 'war-cards', 'War Intel'), 20 * 60 * 1000);
-setInterval(() => loadTabNews('india', INDIA_FALLBACK, 'india-cards', 'India + Tech'), 20 * 60 * 1000);
+// War Intel / India+Tech news is now loaded lazily on first tab open (see
+// switchTab above), not eagerly here — that alone cuts GNews calls on a
+// typical visit from 3 topics down to whichever tabs are actually opened.
+// Background refresh only re-fetches a topic once the user has opened it,
+// and the interval matches the 60-min server cache TTL so we're not paying
+// for requests the cache would've served anyway.
+setInterval(() => {
+  if (tabNewsLoaded.war) loadTabNews('war', WAR_FALLBACK, 'war-cards', 'War Intel');
+}, 60 * 60 * 1000);
+setInterval(() => {
+  if (tabNewsLoaded.india) loadTabNews('india', INDIA_FALLBACK, 'india-cards', 'India + Tech');
+}, 60 * 60 * 1000);
 loadMacro();
 loadStocks();
 setInterval(loadMacro,  5 * 60 * 1000);
