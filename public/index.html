@@ -1497,11 +1497,22 @@ const CALENDAR_EVENTS = [
 // ════════════════════════════════════════════════════════════════
 // LIVE NEWS LOADERS FOR WAR + INDIA TABS
 // ════════════════════════════════════════════════════════════════
-async function loadTabNews(query, fallback, containerId, statusMsg) {
-  // Always use curated fallback for tab-specific content.
-  // The generic backend feed is not filtered by topic and shows the same
-  // general geo news as the main GeoIntel tab — defeating the purpose of these tabs.
-  renderBriefCards(fallback, containerId);
+async function loadTabNews(topic, fallback, containerId, statusMsg) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(BACKEND_URL + '/api/news?topic=' + encodeURIComponent(topic), { signal: controller.signal });
+    clearTimeout(timeout);
+    const data = await res.json();
+    if (data && data.source === 'live' && Array.isArray(data.items) && data.items.length) {
+      renderBriefCards(data.items, containerId);
+      return;
+    }
+    throw new Error('no live items');
+  } catch (e) {
+    // Backend/GNews unavailable for this topic — show curated reference cards instead.
+    renderBriefCards(fallback, containerId);
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1702,28 +1713,29 @@ function renderMacro(data) {
 // April 2026 reference data from RBI / MoSPI / NSE
 // ════════════════════════════════════════════════════════════════
 
-// Verified Apr 2026 reference data — updated in code periodically
+// Verified reference data — last manually refreshed 2026-06-17 against
+// MoSPI/RBI/pump-price reporting. Used only if the live backend is unreachable.
 const MACRO_REFERENCE = {
   market: {
-    sensex:    {value:'80,110',  sub:'Apr 17 close',  color:'mup'},
-    nifty50:   {value:'24,280',  sub:'Apr 17 close',  color:'mup'},
-    niftyBank: {value:'52,840',  sub:'Apr 17 close',  color:'mup'},
-    usdInr:    {value:'87.82',   sub:'Recovery from 94.2 peak', color:'mup'},
-    indiaVix:  {value:'15.2',    sub:'Normalised from 27.17', color:'mup'},
-    goldbees:  {value:'Rs 928',  sub:'Gold ETF (BeES) NAV',    color:'mup'},
+    sensex:    {value:'80,110',  sub:'Reference — backend offline',  color:'mup'},
+    nifty50:   {value:'24,280',  sub:'Reference — backend offline',  color:'mup'},
+    niftyBank: {value:'52,840',  sub:'Reference — backend offline',  color:'mup'},
+    usdInr:    {value:'87.82',   sub:'Reference — backend offline', color:'mup'},
+    indiaVix:  {value:'15.2',    sub:'Reference — backend offline', color:'mup'},
+    goldbees:  {value:'Rs 928',  sub:'Reference — backend offline',    color:'mup'},
   },
   fundamentals: {
-    cpi:       {label:'CPI YoY (Mar)', value:'3.34%',  sub:'Below 4% RBI target',  color:'mup'},
-    repoRate:  {label:'Repo Rate',     value:'6.00%',  sub:'Cut 25bp — Apr 9 MPC', color:'mup'},
-    gdp:       {label:'GDP Q4 FY26',   value:'6.7%',   sub:'FY26 full year 6.5%',  color:'mup'},
-    diiFlows:  {label:'DII Flows (Apr)', value:'+Rs 31,200 cr', sub:'Apr 1-17 cumulative', color:'mup'},
-    fiiFlows:  {label:'FII Flows (Apr)', value:'+Rs 24,600 cr', sub:'Apr 1-17 buying',     color:'mup'},
-    petrolDelhi:{label:'Petrol Delhi', value:'Rs 94.72', sub:'Stable — no revision', color:'mwarn'},
-    dieselDelhi:{label:'Diesel Delhi', value:'Rs 87.62', sub:'Stable — no revision', color:'mwarn'},
-    lpg:       {label:'LPG Cylinder',  value:'Rs 803',  sub:'14.2kg Delhi — Mar 26', color:'mwarn'},
+    cpi:       {label:'CPI YoY (May 2026)', value:'3.93%',  sub:'MoSPI — released Jun 12 2026',  color:'mup'},
+    repoRate:  {label:'Repo Rate',     value:'5.25%',  sub:'RBI MPC Jun 5 — held, Neutral stance', color:'mup'},
+    gdp:       {label:'GDP Q4 FY26',   value:'7.8%',   sub:'FY26 full year 7.7%',  color:'mup'},
+    diiFlows:  {label:'DII Flows (H1 CY26)', value:'+Rs 4.3 lakh cr', sub:'Record net buying, Jan-Jun 9 2026', color:'mup'},
+    fiiFlows:  {label:'FII Flows (H1 CY26)', value:'-Rs 2.8 lakh cr', sub:'Net selling, Jan-Jun 9 2026',     color:'mdn'},
+    petrolDelhi:{label:'Petrol Delhi', value:'Rs 102.12', sub:'As of Jun 16 2026', color:'mwarn'},
+    dieselDelhi:{label:'Diesel Delhi', value:'Rs 95.20', sub:'As of Jun 16 2026', color:'mwarn'},
+    lpg:       {label:'LPG Cylinder',  value:'Rs 942',  sub:'14.2kg Delhi — Jun 16 2026', color:'mwarn'},
     crudeImport:{label:'Crude Basket', value:'$88.6',   sub:'India reference basket', color:'mup'},
-    hormuz:    {label:'Hormuz Status', value:'Open',    sub:'Fully reopened Apr 3',   color:'mup'},
-    rbiWatch:  {value:'RBI cut repo to 6.00% on Apr 9 with accommodative stance — signalling further easing if CPI holds below 4%. FX reserves at $673B (11.8 months cover). Next MPC: Jun 2026. Market pricing 2 more 25bp cuts in FY27.'},
+    hormuz:    {label:'Hormuz Status', value:'Effectively closed', sub:'Conditional ceasefire; shipping volumes still down ~95%', color:'mdn'},
+    rbiWatch:  {value:'RBI MPC (Jun 5 2026) held repo at 5.25%, Neutral stance. May CPI 3.93% YoY. Q4 FY26 GDP 7.8%, full-year 7.7%. DIIs absorbing record FPI selling in H1 CY26.'},
   },
   lastFetched: new Date().toISOString(),
   source: 'reference'
@@ -1742,19 +1754,24 @@ async function loadMacro() {
     const data = await res.json();
     if (data && (data.market || data.fundamentals)) {
       renderMacro(data);
-      if (dot)    dot.className = 's-dot s-green';
-      if (status) status.textContent = 'India macro — live from backend';
+      if (data.source === 'live') {
+        if (dot)    dot.className = 's-dot s-green';
+        if (status) status.textContent = 'Market data live (Stooq/NSE) · fundamentals manually refreshed Jun 17 2026';
+      } else {
+        if (dot)    dot.className = 's-dot s-amber';
+        if (status) status.textContent = 'Market feeds unreachable — showing reference prices + manually refreshed fundamentals';
+      }
       return;
     }
   } catch(e) {
-    // Backend offline — Railway free tier expired
+    // Backend offline
   }
 
   // Fallback: render reference data clearly labelled
   renderMacro(MACRO_REFERENCE);
   if (dot)    dot.className = 's-dot s-amber';
-  if (status) status.textContent = 'Backend offline — showing verified Apr 2026 reference data';
-  if (ts)     ts.textContent = '· RBI / NSE / MoSPI — Apr 17';
+  if (status) status.textContent = 'Backend offline — showing reference data (manually refreshed Jun 17 2026)';
+  if (ts)     ts.textContent = '· RBI / NSE / MoSPI — Jun 17 2026';
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1830,8 +1847,10 @@ async function loadStocks() {
 }
 
 // ── INIT NEW TABS ──────────────────────────────────────────────
-loadTabNews('iran war hormuz oil', WAR_FALLBACK, 'war-cards', 'War Intel');
-loadTabNews('india AI tech rupee', INDIA_FALLBACK, 'india-cards', 'India + Tech');
+loadTabNews('war', WAR_FALLBACK, 'war-cards', 'War Intel');
+loadTabNews('india', INDIA_FALLBACK, 'india-cards', 'India + Tech');
+setInterval(() => loadTabNews('war', WAR_FALLBACK, 'war-cards', 'War Intel'), 20 * 60 * 1000);
+setInterval(() => loadTabNews('india', INDIA_FALLBACK, 'india-cards', 'India + Tech'), 20 * 60 * 1000);
 loadMacro();
 loadStocks();
 setInterval(loadMacro,  5 * 60 * 1000);
