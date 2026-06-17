@@ -6,7 +6,9 @@
 const GNEWS_KEY = process.env.GNEWS_API_KEY || '';
 const CACHE_TTL = 20 * 60 * 1000; // 20 min
 
-let cache = { data: null, ts: 0 };
+// Separate cache per topic so War Intel / India+Tech tabs don't collide
+// with the general feed's cache entry.
+const cacheByTopic = {};
 
 const SEV_KEYWORDS = {
   critical: ['war declared','nuclear','invasion','attack','strike','missile','killed','troops','seized','blockade','sanctions'],
@@ -77,6 +79,42 @@ function buildPrompt(title, sev, affected) {
     + `End with: RISK level, one-sentence MARKET IMPACT, and one WATCH indicator.`;
 }
 
+// GNews /search treats space-separated words as implicit AND — every word
+// must appear in the article, which is why the old literal multi-word
+// queries ("geopolitical war sanctions oil") returned almost nothing.
+// Use explicit OR between keywords for broad recall instead.
+const TOPIC_QUERIES = {
+  general: [
+    'war OR conflict OR sanctions OR tariff OR ceasefire OR military OR missile',
+    'oil OR opec OR crude OR brent OR hormuz OR shipping OR tanker',
+    'india OR rbi OR rupee OR sensex OR nifty OR trade OR economy',
+  ],
+  war: [
+    'war OR military OR missile OR strike OR ceasefire OR invasion OR troops',
+    'hormuz OR houthi OR iran OR israel OR ukraine OR russia OR gaza',
+  ],
+  india: [
+    'india OR rupee OR rbi OR sensex OR nifty OR infosys OR tcs',
+    'india AI OR startup OR tech OR semiconductor OR ipo',
+  ],
+};
+
+function toBriefCards(articles) {
+  return articles.map(a => {
+    const { tag, sev, affected } = classify(a.title, a.description || '');
+    const comList = affected.map(x => x.c).join(', ');
+    return {
+      cat: tag,
+      headline: a.title,
+      body: a.description || '',
+      src: (a.source?.name || 'News') + ' · ' + timeAgo(a.publishedAt),
+      impact: 'Affected: ' + comList + ' (' + sev.toUpperCase() + ' severity)',
+      prompt: buildPrompt(a.title, sev, affected),
+      url: a.url,
+    };
+  });
+}
+
 const REFERENCE_EVENTS = [
   {title:'US-Iran ceasefire holds week 3 — Oman talks on enrichment cap',tag:'geo',src:'Reuters',age:'2h ago',sev:'high',url:'https://www.reuters.com',affected:[{c:'Crude',d:'down'},{c:'Gold',d:'down'}],prompt:'Analyze US-Iran ceasefire impact on crude oil and gold. Model probability-weighted scenarios for full resolution vs re-escalation.'},
   {title:'Houthi strikes resume — Maersk suspends Red Sea routes again',tag:'war',src:'Lloyd List',age:'4h ago',sev:'critical',url:'https://www.ft.com',affected:[{c:'Freight',d:'up'},{c:'Crude',d:'up'}],prompt:'Houthis struck 2 ships post-ceasefire. Analyze freight rate trajectory and Indian export cost transmission.'},
@@ -94,21 +132,25 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  const topic = (req.query && req.query.topic) || 'general';
+  const queries = TOPIC_QUERIES[topic] || TOPIC_QUERIES.general;
+  const cache = cacheByTopic[topic] || { data: null, ts: 0 };
+
   // Serve cache if fresh
   if (cache.data && Date.now() - cache.ts < CACHE_TTL) {
     return res.status(200).json(cache.data);
   }
 
   if (!GNEWS_KEY) {
-    return res.status(200).json({ news: REFERENCE_EVENTS, lastFetched: new Date().toISOString(), source: 'reference' });
+    const payload = { news: REFERENCE_EVENTS, items: [], lastFetched: new Date().toISOString(), source: 'reference' };
+    return res.status(200).json(payload);
   }
 
   try {
-    const queries = ['geopolitical war sanctions oil', 'india macro economy trade', 'opec china us tariff'];
     const allArticles = [];
 
     for (const q of queries) {
-      const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&lang=en&max=5&apikey=${GNEWS_KEY}`;
+      const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&lang=en&max=10&apikey=${GNEWS_KEY}`;
       const r = await fetch(url, { headers: { 'User-Agent': 'GeoIntelTerminal/2.0' } });
       if (!r.ok) continue;
       const d = await r.json();
@@ -119,33 +161,35 @@ export default async function handler(req, res) {
 
     // Deduplicate by title
     const seen = new Set();
-    const news = allArticles
-      .filter(a => {
-        const key = a.title.slice(0, 60);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .slice(0, 12)
-      .map(a => {
-        const { tag, sev, affected } = classify(a.title, a.description || '');
-        return {
-          title: a.title,
-          tag,
-          src: a.source?.name || 'News',
-          age: timeAgo(a.publishedAt),
-          sev,
-          url: a.url,
-          affected,
-          prompt: buildPrompt(a.title, sev, affected),
-        };
-      });
+    const dedup = allArticles.filter(a => {
+      const key = a.title.slice(0, 60);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
-    const payload = { news, lastFetched: new Date().toISOString(), source: 'live' };
-    cache = { data: payload, ts: Date.now() };
+    const news = dedup.slice(0, 16).map(a => {
+      const { tag, sev, affected } = classify(a.title, a.description || '');
+      return {
+        title: a.title,
+        tag,
+        src: a.source?.name || 'News',
+        age: timeAgo(a.publishedAt),
+        sev,
+        url: a.url,
+        affected,
+        prompt: buildPrompt(a.title, sev, affected),
+      };
+    });
+
+    const items = toBriefCards(dedup.slice(0, 12));
+
+    const payload = { news, items, lastFetched: new Date().toISOString(), source: 'live' };
+    cacheByTopic[topic] = { data: payload, ts: Date.now() };
     return res.status(200).json(payload);
 
   } catch (e) {
-    return res.status(200).json({ news: REFERENCE_EVENTS, lastFetched: new Date().toISOString(), source: 'reference' });
+    const payload = { news: REFERENCE_EVENTS, items: [], lastFetched: new Date().toISOString(), source: 'reference' };
+    return res.status(200).json(payload);
   }
 }
