@@ -1,8 +1,10 @@
 // /api/macro.js  —  Vercel serverless function
 // Sources:
-//   Market data  → Stooq (free, no key, CORS-friendly via server-side fetch)
-//   India VIX    → NSE official JSON (live)
-//   FII/DII flows → NSE official JSON (live)
+//   Market data  → Twelve Data (process.env.TWELVE_DATA_API_KEY) first,
+//                  then Stooq (free, no key) if Twelve Data fails/unavailable,
+//                  then hardcoded defaults as last resort
+//   India VIX    → NSE official JSON (live) — unchanged, untouched by the above
+//   FII/DII flows → NSE official JSON (live) — unchanged, untouched by the above
 //   Other fundamentals (CPI/repo/GDP/fuel/LPG) → hardcoded from RBI/MoSPI/PIB/PPAC
 //     (no free live JSON source exists for these — PPAC only publishes PDFs;
 //     update this object manually whenever new data is released)
@@ -83,6 +85,48 @@ const STOOQ_SYMBOLS = {
   brent:     'brent.f',
 };
 
+// Twelve Data symbol/exchange per market field — tried FIRST, before Stooq.
+// Exact symbol coverage for Indian indices on the free Twelve Data tier is
+// unconfirmed; any symbol that 404s or returns no data simply falls through
+// to the existing Stooq fetch below, so this carries no regression risk.
+const TWELVE_DATA_SYMBOLS = {
+  sensex:    { symbol: 'SENSEX',    exchange: 'BSE' },
+  nifty50:   { symbol: 'NIFTY',     exchange: 'NSE' },
+  niftyBank: { symbol: 'NIFTYBANK', exchange: 'NSE' },
+  usdInr:    { symbol: 'USD/INR' },
+  goldbees:  { symbol: 'GOLDBEES',  exchange: 'NSE' },
+  brent:     { symbol: 'XBR/USD' },
+};
+
+async function fetchTwelveDataQuote(symbol, exchange) {
+  const apiKey = process.env.TWELVE_DATA_API_KEY;
+  if (!apiKey) return null;
+  try {
+    let url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
+    if (exchange) url += `&exchange=${encodeURIComponent(exchange)}`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (!data || data.code || data.status === 'error') return null;
+    const close = parseFloat(data.close);
+    const pct = parseFloat(data.percent_change);
+    if (isNaN(close) || isNaN(pct)) return null;
+    return { close, chgPct: pct, up: pct >= 0 };
+  } catch {
+    return null;
+  }
+}
+
+// Tries Twelve Data first, falls back to the existing Stooq fetch on any miss.
+async function fetchMarketField(id) {
+  const td = TWELVE_DATA_SYMBOLS[id];
+  if (td) {
+    const r = await fetchTwelveDataQuote(td.symbol, td.exchange);
+    if (r) return r;
+  }
+  return fetchStooq(STOOQ_SYMBOLS[id]);
+}
+
 async function fetchStooq(symbol) {
   try {
     const url = `https://stooq.com/q/l/?s=${encodeURIComponent(symbol)}&f=sd2t2ohlcv&h&e=csv`;
@@ -157,12 +201,12 @@ export default async function handler(req, res) {
 
   // Fetch market data + NSE live feeds in parallel
   const [sensexD, niftyD, niftyBankD, usdInrD, goldbeesD, brentD, indiaVixD, fiiDiiD] = await Promise.all([
-    fetchStooq(STOOQ_SYMBOLS.sensex),
-    fetchStooq(STOOQ_SYMBOLS.nifty50),
-    fetchStooq(STOOQ_SYMBOLS.niftyBank),
-    fetchStooq(STOOQ_SYMBOLS.usdInr),
-    fetchStooq(STOOQ_SYMBOLS.goldbees),
-    fetchStooq(STOOQ_SYMBOLS.brent),
+    fetchMarketField('sensex'),
+    fetchMarketField('nifty50'),
+    fetchMarketField('niftyBank'),
+    fetchMarketField('usdInr'),
+    fetchMarketField('goldbees'),
+    fetchMarketField('brent'),
     fetchIndiaVix(nseCookie),
     fetchFiiDii(nseCookie),
   ]);
@@ -184,7 +228,7 @@ export default async function handler(req, res) {
     FUNDAMENTALS.crudeImport = {
       label: 'Brent Crude (live)',
       value: '$' + brentD.close.toFixed(2),
-      sub: (brentD.up ? '+' : '') + brentD.chgPct.toFixed(2) + '% today · Stooq',
+      sub: (brentD.up ? '+' : '') + brentD.chgPct.toFixed(2) + '% today',
       color: colorFor(brentD.up),
     };
   }
