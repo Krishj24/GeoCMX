@@ -1,9 +1,25 @@
 // /api/news.js  —  Vercel serverless function
-// Fetches top geopolitical headlines from GNews API,
-// classifies tag + severity, injects commodity impact array.
-// Falls back to curated reference events if GNews quota hit.
+// Fetches headlines from GNews API, then runs them through an LLM relevance
+// gate (Groq, same key already used for War Intel analysis) that decides
+// whether each headline is genuinely market/geopolitically relevant before
+// it's tagged with a category, severity, or commodity impact.
+//
+// Why: GNews's broad keyword search (e.g. "india OR rbi OR ...") will match
+// any article containing one of those words, including pure sports/entertainment
+// stories. The old pipeline then force-classified every article — even
+// ones with zero real signal — defaulting to tag:'geo' and Affected:'Markets UP'.
+// That fabricated a market signal out of nothing (e.g. a cricketer's innings
+// got rendered as "Markets UP"). The LLM relevance pass below is the actual
+// fix: anything that isn't genuinely relevant gets dropped before render,
+// instead of being forced into a tag it doesn't deserve.
+//
+// Falls back to curated reference events if GNews quota is hit, and falls
+// back to plain keyword classification (no forced defaults) if Groq is
+// unavailable — never blocks or errors the response.
 
 const GNEWS_KEY = process.env.GNEWS_API_KEY || '';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 // GNews free tier = 100 requests/day total. Each query below costs 1 request.
 // Cache TTL raised from 20→60 min and topics merged into a single query each
 // (was 3+2+2=7 calls per full refresh cycle, now 1+1+1=3) to stay well under
@@ -55,16 +71,110 @@ function classify(title, description) {
     if (words.some(w => text.includes(w))) { sev = s; break; }
   }
 
-  // Affected commodities
+  // Affected commodities — empty array (not a fabricated default) when
+  // nothing matches. This is the keyword fallback path used only when the
+  // LLM relevance pass below is unavailable, so it must not invent signal.
   const affected = [];
   for (const [com, { keywords, dir }] of Object.entries(COMMODITY_MAP)) {
     if (keywords.some(k => text.match(new RegExp(k)))) {
       affected.push({ c: com.charAt(0).toUpperCase() + com.slice(1), d: dir });
     }
   }
-  if (!affected.length) affected.push({ c: 'Markets', d: 'up' });
 
   return { tag, sev, affected };
+}
+
+// Tags the front-end actually has CSS classes for (tag-war, tag-sanction,
+// tag-supply, tag-trade, tag-geo in index.html) — 'geo' doubles as the
+// general/economic catch-all so the LLM never has to invent an unstyled tag.
+const VALID_TAGS = ['war', 'sanction', 'supply', 'trade', 'geo'];
+const VALID_SEV = ['critical', 'high', 'moderate', 'low'];
+
+// Sends the deduped headline batch to Groq for a relevance + classification
+// pass. Returns a map of { [index]: result } on success, or null on any
+// failure (no key, network error, timeout, malformed JSON) so the caller can
+// fall back to plain keyword classify() without dropping anything.
+async function classifyWithLLM(articles) {
+  if (!GROQ_API_KEY || !articles.length) return null;
+
+  const list = articles.map((a, i) =>
+    `${i}. "${a.title}" — ${(a.description || '').slice(0, 160)}`
+  ).join('\n');
+
+  const prompt = `You are a news triage filter for GeoCMX, a geopolitical-risk and commodity-market intelligence terminal. Below is a numbered list of headlines pulled from a broad keyword search, so some are NOT actually relevant — e.g. sports, entertainment, or celebrity stories that happen to mention a country, company, or person also covered in market news (a cricketer scoring a fifty is NOT a market signal just because the article mentions "India").
+
+For EACH numbered item, decide:
+1. "relevant": true only if the headline carries genuine geopolitical, macroeconomic, market, trade, or commodity-supply signal. When in doubt, mark false.
+2. "score": 0-100, how strong/market-moving the signal is (0 = irrelevant, 100 = major market-moving event).
+3. "tag": one of war, sanction, supply, trade, geo (geo = general geopolitical/economic, use it when nothing else fits), or none if not relevant.
+4. "severity": one of critical, high, moderate, low, or none if not relevant.
+5. "affected": array of {"c": commodity or asset name, "d": "up" or "down"} for things genuinely affected (e.g. Crude, Gold, Wheat, Freight, Copper, INR, Markets). Empty array if nothing specific or not relevant.
+6. "reason": one short sentence justifying the call.
+
+Headlines:
+${list}
+
+Respond with strict JSON only, no prose, no markdown fences: {"results":[{"id":0,"relevant":true,"score":75,"tag":"war","severity":"high","affected":[{"c":"Crude","d":"up"}],"reason":"..."}, ...]} — exactly one entry per headline, "id" matching the headline number above.`;
+
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + GROQ_API_KEY,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 2000,
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const text = data.choices?.[0]?.message?.content || '';
+    if (!text) return null;
+
+    const parsed = JSON.parse(text);
+    if (!parsed || !Array.isArray(parsed.results)) return null;
+
+    const byId = {};
+    for (const item of parsed.results) {
+      if (item && typeof item.id === 'number') byId[item.id] = item;
+    }
+    return byId;
+  } catch {
+    return null;
+  }
+}
+
+// Merges one article's LLM result (if present and well-formed) with the
+// keyword classify() fallback. `llmById` is the map from classifyWithLLM(),
+// or null if that batch failed outright.
+function resolveClassification(article, llmById, index) {
+  const r = llmById ? llmById[index] : null;
+
+  if (r && typeof r.relevant === 'boolean') {
+    const tag = VALID_TAGS.includes(r.tag) ? r.tag : 'geo';
+    const sev = VALID_SEV.includes(r.severity) ? r.severity : 'low';
+    const affected = Array.isArray(r.affected)
+      ? r.affected
+          .filter(a => a && a.c && (a.d === 'up' || a.d === 'down'))
+          .map(a => ({ c: String(a.c), d: a.d }))
+      : [];
+    const score = typeof r.score === 'number' ? r.score : (r.relevant ? 60 : 0);
+    return { tag, sev, affected, relevant: r.relevant && score >= 35 };
+  }
+
+  // No usable LLM entry for this article. If the LLM batch otherwise
+  // succeeded, this single item just failed to parse — better to keep it
+  // (via keyword fallback) than silently drop it on a partial response.
+  // If the whole batch failed (llmById === null), every article goes
+  // through this same path, matching the old no-Groq behavior.
+  const kw = classify(article.title, article.description || '');
+  return { ...kw, relevant: true };
 }
 
 function timeAgo(isoStr) {
@@ -76,7 +186,9 @@ function timeAgo(isoStr) {
 }
 
 function buildPrompt(title, sev, affected) {
-  const comList = affected.map(a => a.c).join(', ');
+  const comList = affected.length
+    ? affected.map(a => a.c).join(', ')
+    : 'no specific commodity — general market/geopolitical signal';
   return `Analyze the commodity and market impact of: "${title}". `
     + `Severity: ${sev.toUpperCase()}. Potentially affected: ${comList}. `
     + `For each commodity, state THEORY (UP/DOWN/NEUTRAL) vs ACTUAL price direction and explain the gap. `
@@ -101,17 +213,20 @@ const TOPIC_QUERIES = {
   ],
 };
 
-function toBriefCards(articles) {
-  return articles.map(a => {
-    const { tag, sev, affected } = classify(a.title, a.description || '');
-    const comList = affected.map(x => x.c).join(', ');
+// Accepts the already-classified { article, cls } pairs built in handler()
+// below — avoids re-running keyword classify() and losing the LLM result.
+function toBriefCards(classifiedArticles) {
+  return classifiedArticles.map(({ article: a, cls }) => {
+    const comList = cls.affected.map(x => x.c).join(', ');
     return {
-      cat: tag,
+      cat: cls.tag,
       headline: a.title,
       body: a.description || '',
       src: (a.source?.name || 'News') + ' · ' + timeAgo(a.publishedAt),
-      impact: 'Affected: ' + comList + ' (' + sev.toUpperCase() + ' severity)',
-      prompt: buildPrompt(a.title, sev, affected),
+      impact: comList
+        ? 'Affected: ' + comList + ' (' + cls.sev.toUpperCase() + ' severity)'
+        : 'General market/geopolitical signal (' + cls.sev.toUpperCase() + ' severity)',
+      prompt: buildPrompt(a.title, cls.sev, cls.affected),
       url: a.url,
     };
   });
@@ -170,21 +285,40 @@ export default async function handler(req, res) {
       return true;
     });
 
-    const news = dedup.slice(0, 16).map(a => {
-      const { tag, sev, affected } = classify(a.title, a.description || '');
-      return {
-        title: a.title,
-        tag,
-        src: a.source?.name || 'News',
-        age: timeAgo(a.publishedAt),
-        sev,
-        url: a.url,
-        affected,
-        prompt: buildPrompt(a.title, sev, affected),
-      };
-    });
+    // LLM relevance + classification pass over the whole deduped batch in
+    // one request. Returns null if Groq is unavailable/fails — in that case
+    // every article falls back to keyword classify() and nothing is dropped
+    // (old behavior, minus the fabricated "Markets UP" default).
+    const llmById = await classifyWithLLM(dedup);
 
-    const items = toBriefCards(dedup.slice(0, 12));
+    const classified = dedup.map((a, i) => ({
+      article: a,
+      cls: resolveClassification(a, llmById, i),
+    }));
+
+    // Only filter out irrelevant articles when the LLM pass actually ran —
+    // if it failed outright, keep everything rather than silently emptying
+    // the feed.
+    let relevant = llmById ? classified.filter(x => x.cls.relevant) : classified;
+
+    // Edge case: LLM ran and marked everything irrelevant (e.g. a quiet news
+    // day where the broad query only surfaced noise). Showing a blank
+    // terminal would look broken, so fall back to keeping the unfiltered
+    // batch rather than an empty feed.
+    if (llmById && !relevant.length && classified.length) relevant = classified;
+
+    const news = relevant.slice(0, 16).map(({ article: a, cls }) => ({
+      title: a.title,
+      tag: cls.tag,
+      src: a.source?.name || 'News',
+      age: timeAgo(a.publishedAt),
+      sev: cls.sev,
+      url: a.url,
+      affected: cls.affected,
+      prompt: buildPrompt(a.title, cls.sev, cls.affected),
+    }));
+
+    const items = toBriefCards(relevant.slice(0, 12));
 
     const payload = { news, items, lastFetched: new Date().toISOString(), source: 'live' };
     cacheByTopic[topic] = { data: payload, ts: Date.now() };
